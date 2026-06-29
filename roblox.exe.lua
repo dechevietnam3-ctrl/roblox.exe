@@ -1,111 +1,104 @@
--- ╔══════════════════════════════════════════════╗
--- ║        NOVA UI  —  v2.1  (2025 Upgrade)      ║
--- ║  glassmorphism · remote spy · explorer tree  ║
--- ╚══════════════════════════════════════════════╝
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║         NOVA UI  v2.2  —  MENU UPGRADE PATCH                 ║
+-- ║   Thay thế toàn bộ phần: NavBar, Header, ToggleBtn, Splash  ║
+-- ╚══════════════════════════════════════════════════════════════╝
 
-local TweenService      = game:GetService("TweenService")
-local UserInputService  = game:GetService("UserInputService")
-local Players           = game:GetService("Players")
-local RunService        = game:GetService("RunService")
-local Lighting          = game:GetService("Lighting")
-local GuiService        = game:GetService("GuiService")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local Lighting         = game:GetService("Lighting")
 
 local Player    = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- ══════════════════════════════════════════
--- THEME  (glass palette)
+-- THEME
 -- ══════════════════════════════════════════
 local T = {
-	BG          = Color3.fromRGB(8,  8,  14),
-	SURFACE     = Color3.fromRGB(18, 18, 28),
-	SURFACE2    = Color3.fromRGB(26, 26, 40),
-	GLASS       = Color3.fromRGB(30, 30, 50),
-	ACCENT      = Color3.fromRGB(99,  102, 241),
-	ACCENT2     = Color3.fromRGB(139, 92,  246),
-	ACCENT3     = Color3.fromRGB(59,  130, 246),
-	SUCCESS     = Color3.fromRGB(34,  197, 94),
-	WARN        = Color3.fromRGB(251, 191, 36),
-	DANGER      = Color3.fromRGB(239, 68,  68),
-	TEXT        = Color3.fromRGB(240, 240, 255),
-	TEXT2       = Color3.fromRGB(160, 160, 200),
-	TEXT3       = Color3.fromRGB(90,  90,  130),
-	BORDER      = Color3.fromRGB(50,  50,  80),
-	BORDER2     = Color3.fromRGB(70,  70,  110),
-	WHITE       = Color3.new(1, 1, 1),
-	COPY_OK     = Color3.fromRGB(52, 211, 153),
+	BG       = Color3.fromRGB(6,   6,  12),
+	SURFACE  = Color3.fromRGB(14,  14, 24),
+	SURFACE2 = Color3.fromRGB(22,  22, 36),
+	GLASS    = Color3.fromRGB(30,  30, 52),
+	ACCENT   = Color3.fromRGB(99,  102,241),
+	ACCENT2  = Color3.fromRGB(139, 92, 246),
+	ACCENT3  = Color3.fromRGB(59,  130,246),
+	SUCCESS  = Color3.fromRGB(34,  197,94),
+	WARN     = Color3.fromRGB(251, 191,36),
+	DANGER   = Color3.fromRGB(239, 68, 68),
+	TEXT     = Color3.fromRGB(240, 240,255),
+	TEXT2    = Color3.fromRGB(160, 160,200),
+	TEXT3    = Color3.fromRGB(90,  90, 130),
+	BORDER   = Color3.fromRGB(44,  44, 72),
+	BORDER2  = Color3.fromRGB(66,  66, 104),
+	WHITE    = Color3.new(1,1,1),
+	COPY_OK  = Color3.fromRGB(52,  211,153),
+	NAV_W    = 72,   -- sidebar width (px)
 }
 
 local EZ      = TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 local EZ_MED  = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local EZ_SLOW = TweenInfo.new(0.5,  Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local EZ_SPR  = TweenInfo.new(0.6,  Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
+local EZ_SLOW = TweenInfo.new(0.50, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local EZ_SPR  = TweenInfo.new(0.60, Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
 
 -- ══════════════════════════════════════════
--- UTILITY
+-- UTILITY (copy từ gốc)
 -- ══════════════════════════════════════════
 local function tween(obj, props, info)
 	TweenService:Create(obj, info or EZ, props):Play()
 end
-
 local function corner(parent, radius)
 	local c = Instance.new("UICorner", parent)
 	c.CornerRadius = UDim.new(0, radius or 10)
 	return c
 end
-
 local function stroke(parent, color, thickness, transparency)
 	local s = Instance.new("UIStroke", parent)
-	s.Color = color or T.BORDER
-	s.Thickness = thickness or 1
-	s.Transparency = transparency or 0
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Color             = color or T.BORDER
+	s.Thickness         = thickness or 1
+	s.Transparency      = transparency or 0
+	s.ApplyStrokeMode   = Enum.ApplyStrokeMode.Border
 	return s
 end
-
 local function gradient(parent, c0, c1, rotation)
 	local g = Instance.new("UIGradient", parent)
-	g.Color = ColorSequence.new(c0, c1)
+	g.Color    = ColorSequence.new(c0, c1)
 	g.Rotation = rotation or 90
 	return g
 end
-
 local function newFrame(parent, props)
 	local f = Instance.new("Frame", parent)
-	f.BackgroundTransparency = props.BT or 0
-	f.BackgroundColor3 = props.BG or T.SURFACE
-	f.Size = props.Size or UDim2.new(1, 0, 0, 40)
-	f.Position = props.Position or UDim2.new(0, 0, 0, 0)
-	f.BorderSizePixel = 0
-	f.ZIndex = props.ZIndex or 5
+	f.BackgroundTransparency = props.BT   or 0
+	f.BackgroundColor3       = props.BG   or T.SURFACE
+	f.Size                   = props.Size or UDim2.new(1,0,0,40)
+	f.Position               = props.Position or UDim2.new(0,0,0,0)
+	f.BorderSizePixel        = 0
+	f.ZIndex                 = props.ZIndex or 5
 	if props.ClipsDescendants then f.ClipsDescendants = true end
 	if props.Name then f.Name = props.Name end
 	return f
 end
-
 local function newLabel(parent, props)
 	local l = Instance.new("TextLabel", parent)
 	l.BackgroundTransparency = 1
-	l.Text = props.Text or ""
-	l.TextColor3 = props.Color or T.TEXT
-	l.TextSize = props.Size or 14
-	l.Font = props.Font or Enum.Font.Gotham
-	l.Size = props.Sz or UDim2.new(1, 0, 1, 0)
-	l.Position = props.Position or UDim2.new(0, 0, 0, 0)
-	l.TextXAlignment = props.AlignX or Enum.TextXAlignment.Left
-	l.TextYAlignment = props.AlignY or Enum.TextYAlignment.Center
-	l.ZIndex = props.ZIndex or 6
-	l.TextTruncate = props.Truncate and Enum.TextTruncate.AtEnd or Enum.TextTruncate.None
+	l.Text          = props.Text     or ""
+	l.TextColor3    = props.Color    or T.TEXT
+	l.TextSize      = props.Size     or 14
+	l.Font          = props.Font     or Enum.Font.Gotham
+	l.Size          = props.Sz       or UDim2.new(1,0,1,0)
+	l.Position      = props.Position or UDim2.new(0,0,0,0)
+	l.TextXAlignment= props.AlignX   or Enum.TextXAlignment.Left
+	l.TextYAlignment= props.AlignY   or Enum.TextYAlignment.Center
+	l.ZIndex        = props.ZIndex   or 6
+	l.TextTruncate  = props.Truncate and Enum.TextTruncate.AtEnd or Enum.TextTruncate.None
 	if props.Wrapped then l.TextWrapped = true end
 	return l
 end
-
--- Copy to clipboard helper (executer env)
 local function copyText(text)
 	pcall(function()
-		if setclipboard then setclipboard(text)
-		elseif toclipboard then toclipboard(text)
-		elseif Clipboard then Clipboard.set(text) end
+		if setclipboard      then setclipboard(text)
+		elseif toclipboard   then toclipboard(text)
+		elseif Clipboard     then Clipboard.set(text) end
 	end)
 end
 
@@ -113,161 +106,675 @@ end
 -- ROOT GUI
 -- ══════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "NovaUI_v2"
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = PlayerGui
+ScreenGui.Name            = "NovaUI_v2"
+ScreenGui.IgnoreGuiInset  = true
+ScreenGui.ResetOnSpawn    = false
+ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent          = PlayerGui
 
--- ══════════════════════════════════════════
--- BACKGROUND BLUR  (glassmorphism layer)
--- ══════════════════════════════════════════
 local BlurEffect = Instance.new("BlurEffect", Lighting)
 BlurEffect.Size = 0
 BlurEffect.Name = "NovaBlur"
 
--- ══════════════════════════════════════════
--- SPLASH
--- ══════════════════════════════════════════
-local Splash = newFrame(ScreenGui, { BG = T.BG, Size = UDim2.new(1,0,1,0), ZIndex = 20 })
-
--- Radial glow behind logo
-local Glow = newFrame(Splash, {
-	BG = T.ACCENT,
-	BT = 0.85,
-	Size = UDim2.new(0, 320, 0, 320),
-	Position = UDim2.new(0.5, -160, 0.5, -200),
-	ZIndex = 20,
-})
-corner(Glow, 160)
-
-local SplashLogo = newLabel(Splash, {
-	Text = "NOVA",
-	Color = T.WHITE,
-	Size = 56,
-	Font = Enum.Font.GothamBold,
-	Sz = UDim2.new(0, 300, 0, 72),
-	Position = UDim2.new(0.5, -150, 0.5, -62),
-	AlignX = Enum.TextXAlignment.Center,
-	ZIndex = 21,
-})
-
-local SplashSub = newLabel(Splash, {
-	Text = "Interface v2.0",
-	Color = T.TEXT3,
-	Size = 13,
-	Sz = UDim2.new(0, 300, 0, 24),
-	Position = UDim2.new(0.5, -150, 0.5, -2),
-	AlignX = Enum.TextXAlignment.Center,
-	ZIndex = 21,
-})
-
--- Animated bar (gradient)
-local SplashBarBg = newFrame(Splash, {
-	BG = T.SURFACE2,
-	Size = UDim2.new(0, 200, 0, 3),
-	Position = UDim2.new(0.5, -100, 0.5, 30),
-	ZIndex = 21,
-})
-corner(SplashBarBg, 2)
-
-local SplashBar = newFrame(SplashBarBg, {
-	BG = T.ACCENT,
-	Size = UDim2.new(0, 0, 1, 0),
-	ZIndex = 22,
-})
-corner(SplashBar, 2)
-gradient(SplashBar, T.ACCENT, T.ACCENT2, 90)
+-- ══════════════════════════════════════════════════════════════
+-- NOVA UI v2.2 — INTRO UPGRADE
+-- Thay thế toàn bộ block "SPLASH" trong script gốc bằng block này
+-- ══════════════════════════════════════════════════════════════
 
 -- ══════════════════════════════════════════
--- PANEL  (glass card)
+-- SPLASH ROOT
 -- ══════════════════════════════════════════
-local PANEL_W = 350
+local Splash = newFrame(ScreenGui, {
+	BG   = T.BG,
+	Size = UDim2.new(1,0,1,0),
+	ZIndex = 30,
+	Name = "NovaSplash",
+})
+
+-- ── Scanline overlay (CRT feel)
+local Scanlines = newFrame(Splash, {
+	BG = Color3.fromRGB(0,0,0), BT = 0.92,
+	Size = UDim2.new(1,0,1,0),
+	ZIndex = 39,
+})
+local slGrad = Instance.new("UIGradient", Scanlines)
+slGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,0,0)),
+	ColorSequenceKeypoint.new(0.49,Color3.fromRGB(0,0,0)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20,20,40)),
+	ColorSequenceKeypoint.new(1,   Color3.fromRGB(0,0,0)),
+})
+slGrad.Rotation = 180
+slGrad.Enabled  = true
+
+-- ── Background radial glow layers
+local glowColors = {
+	{T.ACCENT,  0.88, 340, 340, -170, -230},
+	{T.ACCENT2, 0.92, 260, 260, -80,  -160},
+	{T.ACCENT3, 0.94, 200, 200, -50,  -100},
+}
+for _, gc in ipairs(glowColors) do
+	local g = newFrame(Splash, {
+		BG = gc[1], BT = gc[2],
+		Size = UDim2.new(0, gc[3], 0, gc[4]),
+		Position = UDim2.new(0.5, gc[5], 0.5, gc[6]),
+		ZIndex = 31,
+	})
+	corner(g, gc[3]/2)
+end
+
+-- ── Grid pattern (subtle)
+local Grid = newFrame(Splash, {
+	BG=Color3.fromRGB(0,0,0), BT=1,
+	Size=UDim2.new(1,0,1,0), ZIndex=32,
+})
+-- Horizontal grid lines
+for i=0, 20 do
+	local gl = newFrame(Splash,{
+		BG=Color3.fromRGB(60,60,120), BT=0.93,
+		Size=UDim2.new(1,0,0,1),
+		Position=UDim2.new(0,0,0,i*36),
+		ZIndex=32,
+	})
+end
+-- Vertical grid lines
+for i=0, 30 do
+	local vl = newFrame(Splash,{
+		BG=Color3.fromRGB(60,60,120), BT=0.95,
+		Size=UDim2.new(0,1,1,0),
+		Position=UDim2.new(0,i*40,0,0),
+		ZIndex=32,
+	})
+end
+
+-- ══════════════════════════════════════════
+-- CENTER STAGE
+-- ══════════════════════════════════════════
+
+-- Outer ring (spins during load)
+local OuterRing = newFrame(Splash, {
+	BG=T.ACCENT, BT=0.85,
+	Size=UDim2.new(0,180,0,180),
+	Position=UDim2.new(0.5,-90,0.5,-140),
+	ZIndex=33,
+})
+corner(OuterRing, 90)
+stroke(OuterRing, T.ACCENT, 1.5, 0.3)
+
+-- Inner ring
+local InnerRing = newFrame(Splash, {
+	BG=T.ACCENT2, BT=0.88,
+	Size=UDim2.new(0,140,0,140),
+	Position=UDim2.new(0.5,-70,0.5,-110),
+	ZIndex=34,
+})
+corner(InnerRing, 70)
+stroke(InnerRing, T.ACCENT2, 1, 0.4)
+
+-- Logo card (glass)
+local LogoCard = newFrame(Splash, {
+	BG=Color3.fromRGB(14,14,26), BT=0,
+	Size=UDim2.new(0,100,0,100),
+	Position=UDim2.new(0.5,-50,0.5,-90),
+	ZIndex=35,
+})
+corner(LogoCard, 28)
+stroke(LogoCard, T.ACCENT, 1.5, 0.2)
+gradient(LogoCard, Color3.fromRGB(22,22,44), Color3.fromRGB(10,10,20), 135)
+
+-- "N" glyph
+local NLbl = newLabel(LogoCard,{
+	Text="N", Color=T.WHITE, Size=52, Font=Enum.Font.GothamBold,
+	AlignX=Enum.TextXAlignment.Center,
+	Sz=UDim2.new(1,0,1,0), ZIndex=36,
+})
+NLbl.BackgroundTransparency=1
+
+-- Glow behind N
+local NGlow = newFrame(LogoCard,{
+	BG=T.ACCENT, BT=0.7,
+	Size=UDim2.new(0,60,0,60),
+	Position=UDim2.new(0.5,-30,0.5,-30),
+	ZIndex=35,
+})
+corner(NGlow,30)
+
+-- Arc segments around the ring (decorative)
+local arcAngles = {0, 72, 144, 216, 288}
+local arcFrames = {}
+for i, ang in ipairs(arcAngles) do
+	local arc = newFrame(Splash,{
+		BG=i%2==0 and T.ACCENT or T.ACCENT2,
+		BT=0.6,
+		Size=UDim2.new(0,12,0,12),
+		Position=UDim2.new(
+			0.5 + math.cos(math.rad(ang))*0.12 - 0.02,
+			math.cos(math.rad(ang))*2,
+			0.5 + math.sin(math.rad(ang))*0.12 - 0.12,
+			math.sin(math.rad(ang))*2 - 90
+		),
+		ZIndex=35,
+	})
+	corner(arc,6)
+	arcFrames[i]=arc
+end
+
+-- ══════════════════════════════════════════
+-- WORDMARK  (bên dưới logo)
+-- ══════════════════════════════════════════
+local WordmarkWrap = newFrame(Splash,{
+	BG=Color3.fromRGB(0,0,0), BT=1,
+	Size=UDim2.new(0,280,0,70),
+	Position=UDim2.new(0.5,-140,0.5,40),
+	ZIndex=35,
+})
+
+-- "NOVA" main
+local NovaText = newLabel(WordmarkWrap,{
+	Text="NOVA",
+	Color=T.WHITE, Size=42, Font=Enum.Font.GothamBold,
+	AlignX=Enum.TextXAlignment.Center,
+	Sz=UDim2.new(1,0,0,50), ZIndex=36,
+})
+NovaText.TextTransparency=1
+
+-- Gradient on text via UIGradient
+local textGrad=Instance.new("UIGradient",NovaText)
+textGrad.Color=ColorSequence.new(T.WHITE, Color3.fromRGB(200,190,255))
+textGrad.Rotation=90
+
+-- Subtitle row
+local SubWrap = newFrame(WordmarkWrap,{
+	BG=Color3.fromRGB(0,0,0),BT=1,
+	Size=UDim2.new(1,0,0,20),
+	Position=UDim2.new(0,0,0,50),
+	ZIndex=36,
+})
+local subLL=Instance.new("UIListLayout",SubWrap)
+subLL.FillDirection=Enum.FillDirection.Horizontal
+subLL.HorizontalAlignment=Enum.HorizontalAlignment.Center
+subLL.Padding=UDim.new(0,8)
+
+local subItems = {
+	{text="UI System",   color=T.ACCENT},
+	{text="·",           color=T.TEXT3},
+	{text="v2.2",        color=T.ACCENT2},
+	{text="·",           color=T.TEXT3},
+	{text="Powered",     color=T.SUCCESS},
+}
+local subLabels={}
+for i,si in ipairs(subItems) do
+	local sl=newLabel(SubWrap,{
+		Text=si.text, Color=si.color, Size=11, Font=Enum.Font.GothamBold,
+		Sz=UDim2.new(0,0,1,0), ZIndex=37,
+	})
+	sl.AutomaticSize=Enum.AutomaticSize.X
+	sl.TextTransparency=1
+	subLabels[i]=sl
+end
+
+-- ══════════════════════════════════════════
+-- FEATURE CHIPS  (hiện lần lượt)
+-- ══════════════════════════════════════════
+local ChipWrap = newFrame(Splash,{
+	BG=Color3.fromRGB(0,0,0),BT=1,
+	Size=UDim2.new(0,320,0,28),
+	Position=UDim2.new(0.5,-160,0.5,120),
+	ZIndex=35,
+})
+local chipLL2=Instance.new("UIListLayout",ChipWrap)
+chipLL2.FillDirection=Enum.FillDirection.Horizontal
+chipLL2.HorizontalAlignment=Enum.HorizontalAlignment.Center
+chipLL2.Padding=UDim.new(0,6)
+
+local FEATURES = {
+	{label="Remote Spy",   icon="📡", color=T.ACCENT},
+	{label="Explorer",     icon="❧",  color=T.SUCCESS},
+	{label="GUI Editor",   icon="✏",  color=T.ACCENT2},
+	{label="Keybinds",     icon="⌨",  color=T.WARN},
+	{label="Anti-Cheat",   icon="🛡", color=T.DANGER},
+	{label="Perf Monitor", icon="📊", color=T.ACCENT3},
+}
+local chipFrames={}
+for i,feat in ipairs(FEATURES) do
+	local ch=newFrame(ChipWrap,{
+		BG=Color3.fromRGB(14,14,28),
+		Size=UDim2.new(0,10,0,24), ZIndex=36,
+	})
+	ch.AutomaticSize=Enum.AutomaticSize.X
+	corner(ch,8)
+	stroke(ch, feat.color, 1, 0.5)
+	ch.BackgroundTransparency=1  -- hidden initially
+
+	-- Icon dot
+	local dot=newFrame(ch,{
+		BG=feat.color,
+		Size=UDim2.new(0,6,0,6),
+		Position=UDim2.new(0,8,0.5,-3),
+		ZIndex=37,
+	})
+	corner(dot,3)
+
+	local cl=newLabel(ch,{
+		Text=feat.label,
+		Color=feat.color, Size=9, Font=Enum.Font.GothamBold,
+		Sz=UDim2.new(0,10,1,0), ZIndex=37,
+	})
+	cl.AutomaticSize=Enum.AutomaticSize.X
+	cl.TextTransparency=1
+	local cp=Instance.new("UIPadding",cl)
+	cp.PaddingLeft=UDim.new(0,18); cp.PaddingRight=UDim.new(0,8)
+
+	chipFrames[i]={frame=ch, label=cl, dot=dot, color=feat.color}
+end
+
+-- ══════════════════════════════════════════
+-- PROGRESS BAR  (bottom)
+-- ══════════════════════════════════════════
+local ProgressBg = newFrame(Splash,{
+	BG=T.SURFACE2,
+	Size=UDim2.new(0,260,0,3),
+	Position=UDim2.new(0.5,-130,0.5,168),
+	ZIndex=36,
+})
+corner(ProgressBg,2)
+
+local ProgressFill = newFrame(ProgressBg,{
+	BG=T.ACCENT, Size=UDim2.new(0,0,1,0), ZIndex=37,
+})
+corner(ProgressFill,2)
+gradient(ProgressFill, T.ACCENT, T.ACCENT2, 90)
+
+-- Progress glow tip
+local ProgressTip = newFrame(ProgressFill,{
+	BG=T.WHITE, BT=0.5,
+	Size=UDim2.new(0,6,0,6),
+	Position=UDim2.new(1,-3,0.5,-3),
+	ZIndex=38,
+})
+corner(ProgressTip,3)
+
+-- Progress label
+local ProgressLbl = newLabel(Splash,{
+	Text="Đang khởi động…",
+	Color=T.TEXT3, Size=9, Font=Enum.Font.Gotham,
+	AlignX=Enum.TextXAlignment.Center,
+	Sz=UDim2.new(0,260,0,16),
+	Position=UDim2.new(0.5,-130,0.5,176),
+	ZIndex=36,
+})
+ProgressLbl.TextTransparency=1
+
+-- Status messages
+local STATUS_MSGS = {
+	"Khởi tạo môi trường…",
+	"Nạp Remote Spy module…",
+	"Chuẩn bị Explorer tree…",
+	"Kết nối GUI Editor…",
+	"Tải Keybind Manager…",
+	"Khởi động Anti-Cheat…",
+	"Hoàn tất — Welcome!",
+}
+
+-- ══════════════════════════════════════════
+-- VERSION TAG (bottom-right corner)
+-- ══════════════════════════════════════════
+local VersionTag = newFrame(Splash,{
+	BG=T.SURFACE2,
+	Size=UDim2.new(0,0,0,20),
+	Position=UDim2.new(1,-8,1,-28),
+	ZIndex=36,
+})
+VersionTag.AutomaticSize=Enum.AutomaticSize.X
+VersionTag.AnchorPoint=Vector2.new(1,1)
+corner(VersionTag,6)
+stroke(VersionTag,T.BORDER,1)
+local vtLbl=newLabel(VersionTag,{
+	Text="Nova UI  v2.2",
+	Color=T.TEXT3, Size=9,
+	Sz=UDim2.new(0,10,1,0), ZIndex=37,
+})
+vtLbl.AutomaticSize=Enum.AutomaticSize.X
+local vtPad=Instance.new("UIPadding",vtLbl)
+vtPad.PaddingLeft=UDim.new(0,8); vtPad.PaddingRight=UDim.new(0,8)
+
+-- ══════════════════════════════════════════
+-- INTRO ANIMATION SEQUENCE
+-- ══════════════════════════════════════════
+task.spawn(function()
+
+	-- Phase 0: rings pulse in
+	OuterRing.BackgroundTransparency=1
+	InnerRing.BackgroundTransparency=1
+	LogoCard.BackgroundTransparency=1
+	NGlow.BackgroundTransparency=1
+	NLbl.TextTransparency=1
+
+	task.wait(0.1)
+
+	-- Outer ring zoom in
+	OuterRing.Size=UDim2.new(0,20,0,20)
+	OuterRing.Position=UDim2.new(0.5,-10,0.5,-50)
+	tween(OuterRing,{
+		Size=UDim2.new(0,180,0,180),
+		Position=UDim2.new(0.5,-90,0.5,-140),
+		BackgroundTransparency=0.85,
+	}, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	task.wait(0.12)
+
+	tween(InnerRing,{
+		Size=UDim2.new(0,140,0,140),
+		Position=UDim2.new(0.5,-70,0.5,-110),
+		BackgroundTransparency=0.88,
+	}, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	task.wait(0.1)
+
+	-- Logo card appear
+	LogoCard.Size=UDim2.new(0,60,0,60)
+	LogoCard.Position=UDim2.new(0.5,-30,0.5,-60)
+	tween(LogoCard,{
+		Size=UDim2.new(0,100,0,100),
+		Position=UDim2.new(0.5,-50,0.5,-90),
+		BackgroundTransparency=0,
+	}, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+
+	tween(NGlow,{BackgroundTransparency=0.7}, TweenInfo.new(0.4))
+	task.wait(0.25)
+
+	tween(NLbl,{TextTransparency=0}, TweenInfo.new(0.3))
+	task.wait(0.2)
+
+	-- Arc dots spin into place
+	for i,arc in ipairs(arcFrames) do
+		task.spawn(function()
+			arc.BackgroundTransparency=1
+			task.wait((i-1)*0.05)
+			tween(arc,{BackgroundTransparency=0.6}, TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out))
+		end)
+	end
+	task.wait(0.3)
+
+	-- Phase 1: wordmark slides up
+	WordmarkWrap.Position=UDim2.new(0.5,-140,0.5,60)
+	tween(WordmarkWrap,{Position=UDim2.new(0.5,-140,0.5,40)},
+	TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out))
+	tween(NovaText,{TextTransparency=0}, TweenInfo.new(0.35))
+	task.wait(0.2)
+
+	-- Subtitle items appear one by one
+	for i,sl in ipairs(subLabels) do
+		task.spawn(function()
+			task.wait((i-1)*0.05)
+			tween(sl,{TextTransparency=0},TweenInfo.new(0.25))
+		end)
+	end
+	task.wait(0.4)
+
+	-- Phase 2: progress bar + chips + status
+	tween(ProgressLbl,{TextTransparency=0},TweenInfo.new(0.3))
+
+	-- Spin the outer ring continuously
+	task.spawn(function()
+		local rot=0
+		while Splash and Splash.Parent do
+			task.wait(0.02)
+			rot=(rot+1.2)%360
+			for i,arc in ipairs(arcFrames) do
+				local ang=rot + (i-1)*72
+				arc.Position=UDim2.new(
+					0.5 + math.cos(math.rad(ang))*0.12 - 0.02,
+					math.cos(math.rad(ang))*2,
+					0.5 + math.sin(math.rad(ang))*0.12 - 0.12,
+					math.sin(math.rad(ang))*2 - 90
+				)
+			end
+		end
+	end)
+
+	-- Inner ring counter-spin (subtle pulse)
+	task.spawn(function()
+		while Splash and Splash.Parent do
+			tween(InnerRing,{BackgroundTransparency=0.82},
+			TweenInfo.new(0.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut))
+			task.wait(0.7)
+			tween(InnerRing,{BackgroundTransparency=0.92},
+			TweenInfo.new(0.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut))
+			task.wait(0.7)
+		end
+	end)
+
+	-- Progress + chips + status messages
+	local totalSteps = #FEATURES
+	for i,cf in ipairs(chipFrames) do
+		task.wait(0.18)
+
+		-- Update status label
+		if STATUS_MSGS[i] then
+			ProgressLbl.Text = STATUS_MSGS[i]
+		end
+
+		-- Reveal chip
+		tween(cf.frame,{BackgroundTransparency=0},
+		TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out))
+		tween(cf.label,{TextTransparency=0},TweenInfo.new(0.2))
+
+		-- Progress bar advance
+		local prog = i/totalSteps
+		tween(ProgressFill,{Size=UDim2.new(prog,0,1,0)},
+		TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
+	end
+
+	-- Final status
+	task.wait(0.18)
+	ProgressLbl.Text = STATUS_MSGS[#STATUS_MSGS]
+	tween(ProgressFill,{Size=UDim2.new(1,0,1,0)},
+	TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
+
+	-- Flash: all chips pulse white briefly
+	task.wait(0.25)
+	for _,cf in ipairs(chipFrames) do
+		tween(cf.frame,{BackgroundColor3=cf.color},TweenInfo.new(0.15))
+		tween(cf.label,{TextColor3=T.WHITE},TweenInfo.new(0.15))
+	end
+	task.wait(0.3)
+	for _,cf in ipairs(chipFrames) do
+		tween(cf.frame,{BackgroundColor3=Color3.fromRGB(14,14,28)},TweenInfo.new(0.3))
+		tween(cf.label,{TextColor3=cf.color},TweenInfo.new(0.3))
+	end
+
+	-- Phase 3: logo scale up briefly then fade out
+	task.wait(0.4)
+	tween(LogoCard,{
+		Size=UDim2.new(0,112,0,112),
+		Position=UDim2.new(0.5,-56,0.5,-96),
+	}, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	tween(NLbl,{TextTransparency=0.1,TextColor3=T.ACCENT},TweenInfo.new(0.2))
+
+	task.wait(0.22)
+
+	-- Phase 4: full screen flash then wipe out
+	local Flash = newFrame(Splash,{
+		BG=T.WHITE, BT=1,
+		Size=UDim2.new(1,0,1,0), ZIndex=50,
+	})
+	tween(Flash,{BackgroundTransparency=0.92},TweenInfo.new(0.12))
+	task.wait(0.12)
+	tween(Flash,{BackgroundTransparency=1},TweenInfo.new(0.3))
+
+	-- Wipe upward
+	tween(Splash,{
+		Position=UDim2.new(0,0,-1,0),
+		BackgroundTransparency=0.3,
+	}, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.In))
+
+	task.wait(0.5)
+	Splash:Destroy()
+
+	-- ── Show toggle button ──
+	ToggleBtn.Size    = UDim2.new(0,20,0,20)
+	ToggleBtn.Visible = true
+	Ring.Size         = UDim2.new(0,20,0,20)
+	Ring.Visible      = true
+	tween(ToggleBtn,{Size=UDim2.new(0,50,0,50)},
+	TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	tween(Ring,{Size=UDim2.new(0,50,0,50)},
+	TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+
+	task.wait(0.3)
+	showToast("Nova UI v2.2  —  Ready ✓","ok")
+
+	-- Pulse ring loop
+	task.spawn(function()
+		while ToggleBtn and ToggleBtn.Parent do
+			task.wait(2.8)
+			if not menuOpen then
+				Ring.Size=UDim2.new(0,50,0,50)
+				Ring.Position=ToggleBtn.Position
+				Ring.BackgroundTransparency=0.5
+				tween(Ring,{
+					Size=UDim2.new(0,76,0,76),
+					Position=UDim2.new(
+						Ring.Position.X.Scale,
+						Ring.Position.X.Offset-13,
+						Ring.Position.Y.Scale,
+						Ring.Position.Y.Offset-13
+					),
+					BackgroundTransparency=1,
+				},TweenInfo.new(0.9,Enum.EasingStyle.Quad,Enum.EasingDirection.Out))
+				task.wait(0.9)
+			end
+		end
+	end)
+end)
+-- ══════════════════════════════════════════
+-- PANEL
+-- ══════════════════════════════════════════
+local PANEL_W = 360
 
 local Panel = newFrame(ScreenGui, {
-	BG = T.BG,
+	BG   = T.BG,
 	Size = UDim2.new(0, PANEL_W, 1, 0),
 	Position = UDim2.new(1, 0, 0, 0),
 	ZIndex = 10,
 	ClipsDescendants = true,
 	Name = "NovaPanel",
 })
+gradient(Panel, Color3.fromRGB(10,10,20), Color3.fromRGB(6,6,12), 180)
 stroke(Panel, T.BORDER, 1)
 
--- Subtle gradient on panel BG
-gradient(Panel, Color3.fromRGB(12,12,22), Color3.fromRGB(8,8,16), 180)
+-- ══════════════════════════════════════════
+-- HEADER  (v2.2 — nâng cấp)
+-- ══════════════════════════════════════════
+local HEADER_H = 72
 
--- Left accent bar (gradient)
-local PanelAccentLine = newFrame(Panel, {
-	BG = T.ACCENT,
-	Size = UDim2.new(0, 2, 1, 0),
-	ZIndex = 11,
-})
-gradient(PanelAccentLine, T.ACCENT, T.ACCENT2, 180)
-
--- ──────── HEADER (glassmorphism) ────────
 local Header = newFrame(Panel, {
-	BG = T.SURFACE,
-	Size = UDim2.new(1, 0, 0, 66),
+	BG   = Color3.fromRGB(12,12,22),
+	Size = UDim2.new(1, 0, 0, HEADER_H),
 	ZIndex = 11,
 })
-gradient(Header,
-	Color3.fromRGB(24,24,40),
-	Color3.fromRGB(16,16,28), 180)
+gradient(Header, Color3.fromRGB(18,18,36), Color3.fromRGB(10,10,20), 180)
 stroke(Header, T.BORDER, 1)
 
--- Glow dot behind logo
-local HeaderGlow = newFrame(Header, {
-	BG = T.ACCENT,
-	BT = 0.82,
-	Size = UDim2.new(0, 60, 0, 60),
-	Position = UDim2.new(0, -10, 0.5, -30),
-	ZIndex = 11,
-})
-corner(HeaderGlow, 30)
-
-local HeaderLogo = newLabel(Header, {
-	Text = "NOVA",
-	Color = T.WHITE,
-	Size = 19,
-	Font = Enum.Font.GothamBold,
-	Sz = UDim2.new(0, 80, 0, 26),
-	Position = UDim2.new(0, 16, 0, 12),
+-- Accent top line
+local HeaderTopLine = newFrame(Header, {
+	BG   = T.ACCENT,
+	Size = UDim2.new(1, 0, 0, 2),
 	ZIndex = 12,
 })
+gradient(HeaderTopLine, T.ACCENT, T.ACCENT2, 90)
 
-local HeaderDot = newFrame(Header, {
-	BG = T.ACCENT,
-	Size = UDim2.new(0, 6, 0, 6),
-	Position = UDim2.new(0, 59, 0, 20),
+-- Logo icon bg
+local LogoBg = newFrame(Header, {
+	BG   = T.ACCENT,
+	Size = UDim2.new(0,42,0,42),
+	Position = UDim2.new(0,16,0.5,-21),
 	ZIndex = 12,
 })
-corner(HeaderDot, 4)
+corner(LogoBg, 13)
+gradient(LogoBg, T.ACCENT, T.ACCENT2, 135)
+stroke(LogoBg, Color3.fromRGB(140,120,255), 1, 0.4)
 
-local HeaderSub = newLabel(Header, {
-	Text = "v2.0  •  UI System",
-	Color = T.TEXT3,
-	Size = 10,
-	Sz = UDim2.new(0, 160, 0, 16),
-	Position = UDim2.new(0, 16, 0, 38),
-	ZIndex = 12,
+newLabel(LogoBg, {
+	Text="N", Color=T.WHITE, Size=22, Font=Enum.Font.GothamBold,
+	AlignX=Enum.TextXAlignment.Center, ZIndex=13,
 })
 
--- Status indicator
-local StatusDot = newFrame(Header, {
-	BG = T.SUCCESS,
-	Size = UDim2.new(0, 7, 0, 7),
-	Position = UDim2.new(0, 116, 0, 41),
+-- Logo text
+newLabel(Header, {
+	Text="NOVA UI",
+	Color=T.WHITE, Size=16, Font=Enum.Font.GothamBold,
+	Sz=UDim2.new(0,120,0,22),
+	Position=UDim2.new(0,68,0,13),
+	ZIndex=12,
+})
+newLabel(Header, {
+	Text="v2.2  ·  Executor Interface",
+	Color=T.TEXT3, Size=9,
+	Sz=UDim2.new(0,160,0,16),
+	Position=UDim2.new(0,68,0,36),
+	ZIndex=12,
+})
+
+-- Status pill
+local StatusPill = newFrame(Header, {
+	BG   = Color3.fromRGB(10,32,16),
+	Size = UDim2.new(0,68,0,18),
+	Position = UDim2.new(0,68,0,54),
 	ZIndex = 12,
 })
-corner(StatusDot, 4)
+corner(StatusPill, 6)
+stroke(StatusPill, T.SUCCESS, 1, 0.5)
+
+local StatusDot = newFrame(StatusPill, {
+	BG   = T.SUCCESS,
+	Size = UDim2.new(0,6,0,6),
+	Position = UDim2.new(0,7,0.5,-3),
+	ZIndex = 13,
+})
+corner(StatusDot, 3)
+
+newLabel(StatusPill, {
+	Text="Online",
+	Color=T.SUCCESS, Size=9, Font=Enum.Font.GothamBold,
+	Sz=UDim2.new(1,-20,1,0),
+	Position=UDim2.new(0,18,0,0),
+	ZIndex=13,
+})
+
+-- Pulse anim trên status dot
+task.spawn(function()
+	while StatusDot and StatusDot.Parent do
+		tween(StatusDot, {BackgroundTransparency=0.6},
+		TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
+		task.wait(0.8)
+		tween(StatusDot, {BackgroundTransparency=0},
+		TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
+		task.wait(0.8)
+	end
+end)
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton", Header)
+MinBtn.Size = UDim2.new(0,30,0,30)
+MinBtn.Position = UDim2.new(1,-76,0.5,-15)
+MinBtn.Text = "—"
+MinBtn.TextSize = 13
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextColor3 = T.TEXT3
+MinBtn.BackgroundColor3 = T.SURFACE2
+MinBtn.BorderSizePixel = 0
+MinBtn.ZIndex = 12
+corner(MinBtn, 8)
+stroke(MinBtn, T.BORDER, 1)
+MinBtn.MouseEnter:Connect(function() tween(MinBtn,{BackgroundColor3=T.WARN,TextColor3=T.BG}) end)
+MinBtn.MouseLeave:Connect(function() tween(MinBtn,{BackgroundColor3=T.SURFACE2,TextColor3=T.TEXT3}) end)
 
 -- Close button
 local CloseBtn = Instance.new("TextButton", Header)
-CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-CloseBtn.Position = UDim2.new(1, -46, 0.5, -16)
+CloseBtn.Size = UDim2.new(0,30,0,30)
+CloseBtn.Position = UDim2.new(1,-40,0.5,-15)
 CloseBtn.Text = "✕"
-CloseBtn.TextSize = 13
+CloseBtn.TextSize = 12
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextColor3 = T.TEXT3
 CloseBtn.BackgroundColor3 = T.SURFACE2
@@ -275,201 +782,746 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.ZIndex = 12
 corner(CloseBtn, 8)
 stroke(CloseBtn, T.BORDER, 1)
+CloseBtn.MouseEnter:Connect(function() tween(CloseBtn,{BackgroundColor3=T.DANGER,TextColor3=T.WHITE}) end)
+CloseBtn.MouseLeave:Connect(function() tween(CloseBtn,{BackgroundColor3=T.SURFACE2,TextColor3=T.TEXT3}) end)
 
-CloseBtn.MouseEnter:Connect(function()
-	tween(CloseBtn, { BackgroundColor3 = T.DANGER, TextColor3 = T.WHITE })
-end)
-CloseBtn.MouseLeave:Connect(function()
-	tween(CloseBtn, { BackgroundColor3 = T.SURFACE2, TextColor3 = T.TEXT3 })
-end)
+-- ══════════════════════════════════════════
+-- NAV SIDEBAR  v2.2 (hoàn toàn mới)
+-- ══════════════════════════════════════════
+local NAV_W = T.NAV_W
 
--- ──────── NAV BAR ────────
 local NavBar = newFrame(Panel, {
-	BG = T.SURFACE,
-	Size = UDim2.new(0, 60, 1, -66),
-	Position = UDim2.new(0, 0, 0, 66),
+	BG   = Color3.fromRGB(8,8,16),
+	Size = UDim2.new(0, NAV_W, 1, -HEADER_H),
+	Position = UDim2.new(0, 0, 0, HEADER_H),
 	ZIndex = 11,
 })
-gradient(NavBar, Color3.fromRGB(22,22,36), Color3.fromRGB(16,16,26), 180)
+gradient(NavBar, Color3.fromRGB(12,12,22), Color3.fromRGB(7,7,14), 180)
 stroke(NavBar, T.BORDER, 1)
 
-local NavList = Instance.new("UIListLayout", NavBar)
+-- Top fade overlay
+local NavTopFade = newFrame(NavBar, {
+	BG=T.BG, BT=1,
+	Size=UDim2.new(1,0,0,8), ZIndex=14,
+})
+-- Gradient fade từ trên xuống
+local ntfg = Instance.new("UIGradient", NavTopFade)
+ntfg.Color    = ColorSequence.new(Color3.fromRGB(8,8,16), Color3.fromRGB(8,8,16))
+ntfg.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0,0),
+	NumberSequenceKeypoint.new(1,1),
+})
+ntfg.Rotation = 180
+
+-- Scrollable nav list
+local NavScroll = Instance.new("ScrollingFrame", NavBar)
+NavScroll.Size = UDim2.new(1,0,1,-8)
+NavScroll.Position = UDim2.new(0,0,0,8)
+NavScroll.BackgroundTransparency = 1
+NavScroll.BorderSizePixel = 0
+NavScroll.ScrollBarThickness = 0
+NavScroll.CanvasSize = UDim2.new(0,0,0,0)
+NavScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+NavScroll.ZIndex = 12
+
+local NavList = Instance.new("UIListLayout", NavScroll)
 NavList.SortOrder = Enum.SortOrder.LayoutOrder
-NavList.Padding = UDim.new(0, 3)
+NavList.Padding = UDim.new(0,2)
 NavList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local navPad = Instance.new("UIPadding", NavBar)
-navPad.PaddingTop = UDim.new(0, 12)
 
--- Active nav indicator (left strip)
-local NavIndicator = newFrame(NavBar, {
-	BG = T.ACCENT,
-	Size = UDim2.new(0, 3, 0, 36),
-	Position = UDim2.new(0, 0, 0, 0),
-	ZIndex = 13,
+local navTopPad = Instance.new("UIPadding", NavScroll)
+navTopPad.PaddingTop    = UDim.new(0,6)
+navTopPad.PaddingBottom = UDim.new(0,6)
+
+-- Active selection indicator (pill trái)
+local NavPill = newFrame(NavBar, {
+	BG   = T.ACCENT,
+	Size = UDim2.new(0,3,0,38),
+	Position = UDim2.new(0,0,0,0),
+	ZIndex = 15,
 })
-corner(NavIndicator, 2)
-gradient(NavIndicator, T.ACCENT, T.ACCENT2, 180)
-NavIndicator.Visible = false
+corner(NavPill, 2)
+gradient(NavPill, T.ACCENT, T.ACCENT2, 180)
+NavPill.Visible = false
 
--- ──────── CONTENT AREA ────────
+-- Tooltip frame
+local NavTooltip = newFrame(ScreenGui, {
+	BG   = Color3.fromRGB(20,20,36),
+	Size = UDim2.new(0,10,0,26),
+	Position = UDim2.new(0,0,0,0),
+	ZIndex = 60,
+})
+NavTooltip.AutomaticSize = Enum.AutomaticSize.X
+NavTooltip.Visible = false
+corner(NavTooltip, 7)
+stroke(NavTooltip, T.BORDER2, 1)
+
+-- Tooltip arrow (triangle pointing left)
+local TooltipArrow = newFrame(NavTooltip, {
+	BG   = Color3.fromRGB(20,20,36),
+	Size = UDim2.new(0,7,0,7),
+	Position = UDim2.new(0,-4,0.5,-4),
+	ZIndex = 59,
+})
+TooltipArrow.Rotation = 45
+
+local TooltipLabel = newLabel(NavTooltip, {
+	Text = "",
+	Color = T.TEXT, Size = 11, Font = Enum.Font.GothamBold,
+	Sz = UDim2.new(1,0,1,0),
+	ZIndex = 61,
+})
+TooltipLabel.AutomaticSize = Enum.AutomaticSize.X
+local ttpPad = Instance.new("UIPadding", TooltipLabel)
+ttpPad.PaddingLeft  = UDim.new(0,10)
+ttpPad.PaddingRight = UDim.new(0,10)
+
+-- ── Nav Definitions ──
+local navDefs = {
+	{ name="Home",      icon="⌂",  order=1,  color=T.ACCENT,  divAfter=false },
+	{ name="Players",   icon="◉",  order=2,  color=T.ACCENT3, divAfter=false },
+	{ name="Events",    icon="★",  order=3,  color=T.WARN,    divAfter=false },
+	{ name="Explorer",  icon="❧",  order=4,  color=T.SUCCESS, divAfter=true  },  -- divider
+	{ name="GUIEdit",   icon="✏",  order=5,  color=T.ACCENT2, divAfter=false },
+	{ name="Display",   icon="◫",  order=6,  color=T.ACCENT3, divAfter=true  },  -- divider
+	{ name="Settings",  icon="⚙",  order=7,  color=T.TEXT2,   divAfter=false },
+	{ name="Perf",      icon="📊", order=8,  color=T.WARN,    divAfter=false },
+	{ name="Console",   icon="📝", order=9,  color=T.SUCCESS, divAfter=false },
+	{ name="AntiCheat", icon="🛡", order=10, color=T.DANGER,  divAfter=true  },  -- divider
+	{ name="Keybinds",  icon="⌨",  order=11, color=T.ACCENT,  divAfter=false },
+}
+
+-- ── Divider helper ──
+local function makeNavDivider(parent, order)
+	local div = newFrame(parent, {
+		BG=T.BORDER, BT=0.5,
+		Size=UDim2.new(0,36,0,1),
+		ZIndex=12,
+	})
+	div.LayoutOrder = order
+	local dPad = Instance.new("UIPadding",div)
+	dPad.PaddingTop=UDim.new(0,3); dPad.PaddingBottom=UDim.new(0,3)
+	return div
+end
+
+-- ── State ──
+local navButtons  = {}
+local pages       = {}
+local currentPage = nil
+local pageCallbacks = {}
+
+-- ── Page content area ──
 local ContentArea = newFrame(Panel, {
-	BG = Color3.fromRGB(0,0,0),
-	BT = 1,
-	Size = UDim2.new(1, -60, 1, -66),
-	Position = UDim2.new(0, 60, 0, 66),
-	ZIndex = 10,
+	BG=Color3.fromRGB(0,0,0), BT=1,
+	Size=UDim2.new(1,-NAV_W,1,-HEADER_H),
+	Position=UDim2.new(0,NAV_W,0,HEADER_H),
+	ZIndex=10,
 })
 
--- ══════════════════════════════════════════
--- NAV SYSTEM
--- ══════════════════════════════════════════
-local navButtons    = {}
-local pages         = {}
-local currentPage   = nil
-local pageCallbacks = {}   -- [pageName] = function()  called on first/every switch
-
+-- ── Switch page (upgraded: slide + fade) ──
 local function switchPage(name)
 	if currentPage == name then return end
 	currentPage = name
+
 	for n, page in pairs(pages) do
 		if n == name then
 			page.Visible = true
 			page.BackgroundTransparency = 1
-			-- Slide-in from right
-			page.Position = UDim2.new(0.08, 0, 0, 0)
-			tween(page, { Position = UDim2.new(0,0,0,0) }, EZ_MED)
+			page.Position = UDim2.new(0.06, 0, 0, 0)
+			tween(page, {Position=UDim2.new(0,0,0,0)}, EZ_MED)
 		else
 			page.Visible = false
 		end
 	end
+
 	for n, btn in pairs(navButtons) do
+		local def = nil
+		for _, d in ipairs(navDefs) do if d.name == n then def = d; break end end
+		local accentCol = def and def.color or T.ACCENT
+
 		if n == name then
-			tween(btn.bg,   { BackgroundColor3 = T.ACCENT })
-			tween(btn.icon, { TextColor3 = T.WHITE })
-			tween(btn.lbl,  { TextTransparency = 0 })
-			-- Move nav indicator
-			NavIndicator.Visible = true
-			tween(NavIndicator, { Position = UDim2.new(0, 0, 0, btn.bg.AbsolutePosition.Y - NavBar.AbsolutePosition.Y + 3) }, EZ_MED)
+			tween(btn.bg,    {BackgroundColor3 = accentCol})
+			tween(btn.icon,  {TextColor3 = T.WHITE})
+			tween(btn.label, {TextColor3 = T.WHITE, TextTransparency=0})
+			-- Move pill indicator
+			NavPill.Visible = true
+			local targetY = btn.bg.AbsolutePosition.Y - NavBar.AbsolutePosition.Y
+			tween(NavPill, {
+				Position = UDim2.new(0,0,0, targetY+3),
+				Size     = UDim2.new(0,3,0,38),
+				BackgroundColor3 = accentCol,
+			}, EZ_MED)
 		else
-			tween(btn.bg,   { BackgroundColor3 = T.SURFACE })
-			tween(btn.icon, { TextColor3 = T.TEXT3 })
-			tween(btn.lbl,  { TextTransparency = 1 })
+			tween(btn.bg,    {BackgroundColor3 = T.SURFACE})
+			tween(btn.icon,  {TextColor3 = T.TEXT3})
+			tween(btn.label, {TextColor3 = T.TEXT3, TextTransparency=0})
 		end
 	end
-	-- Fire page-specific callback (e.g. lazy init)
-	if pageCallbacks[name] then
-		pageCallbacks[name]()
-	end
+
+	if pageCallbacks[name] then pageCallbacks[name]() end
 end
 
-local navDefs = {
-	{ name = "Home",     icon = "⌂",  order = 1 },
-	{ name = "Players",  icon = "◉",  order = 2 },
-	{ name = "Events",   icon = "★",  order = 3 },
-	{ name = "Explorer", icon = "❧",  order = 4 },
-	{ name = "GUIEdit",  icon = "✏",  order = 5 },
-	{ name = "Settings", icon = "⚙",  order = 6 },
-	{ name = "Display",  icon = "◫",  order = 7 },
-	{ name = "Perf",     icon = "📊", order = 8 },-- Performance Monitor
-	{ name = "Console",  icon = "📝", order = 9 },
-	{ name = "AntiCheat", icon = "🛡", order = 10 },
-	{ name = "Keybinds", icon = "⌨",  order = 11},  -- Keybind Manager
-}
-
-
-
+-- ── Build each nav button ──
+local divOrder = 100
 for _, def in ipairs(navDefs) do
-	local wrap = Instance.new("TextButton", NavBar)
-	wrap.Size = UDim2.new(0, 44, 0, 54)
+
+	-- Wrapper button
+	local wrap = Instance.new("TextButton", NavScroll)
+	wrap.Size = UDim2.new(0, NAV_W-6, 0, 58)
 	wrap.BackgroundTransparency = 1
 	wrap.Text = ""
 	wrap.BorderSizePixel = 0
 	wrap.ZIndex = 12
-	wrap.LayoutOrder = def.order
+	wrap.LayoutOrder = def.order * 2
 
+	-- Background card
 	local bg = newFrame(wrap, {
-		BG = T.SURFACE,
-		Size = UDim2.new(0, 38, 0, 44),
-		Position = UDim2.new(0.5, -19, 0, 4),
+		BG   = T.SURFACE,
+		Size = UDim2.new(0, NAV_W-12, 0, 52),
+		Position = UDim2.new(0, 3, 0, 3),
 		ZIndex = 12,
 	})
 	corner(bg, 12)
 	stroke(bg, T.BORDER, 1)
 
+	-- Glow dot (top-right corner, shows when active)
+	local glowDot = newFrame(bg, {
+		BG   = def.color,
+		Size = UDim2.new(0,5,0,5),
+		Position = UDim2.new(1,-8,0,6),
+		ZIndex = 14,
+	})
+	corner(glowDot, 3)
+	glowDot.Visible = false
+
+	-- Icon
 	local iconLbl = newLabel(bg, {
-		Text = def.icon,
-		Color = T.TEXT3,
-		Size = 18,
+		Text   = def.icon,
+		Color  = T.TEXT3,
+		Size   = 20,
 		AlignX = Enum.TextXAlignment.Center,
-		Sz = UDim2.new(1, 0, 0, 28),
-		Position = UDim2.new(0, 0, 0, 4),
+		Sz     = UDim2.new(1,0,0,30),
+		Position = UDim2.new(0,0,0,5),
 		ZIndex = 13,
 	})
 
-	local lbl = newLabel(bg, {
-		Text = def.name,
-		Color = T.WHITE,
-		Size = 6,
+	-- Label bên dưới icon
+	local label = newLabel(bg, {
+		Text   = def.name,
+		Color  = T.TEXT3,
+		Size   = 7,
+		Font   = Enum.Font.GothamBold,
 		AlignX = Enum.TextXAlignment.Center,
-		Sz = UDim2.new(1, 0, 0, 11),
-		Position = UDim2.new(0, 0, 1, -12),
+		Sz     = UDim2.new(1,0,0,13),
+		Position = UDim2.new(0,0,0,35),
 		ZIndex = 13,
 	})
-	lbl.TextTransparency = 1
 
-	navButtons[def.name] = { bg = bg, icon = iconLbl, lbl = lbl }
+	navButtons[def.name] = {
+		bg       = bg,
+		icon     = iconLbl,
+		label    = label,
+		glowDot  = glowDot,
+		def      = def,
+	}
 
-	wrap.MouseButton1Click:Connect(function() switchPage(def.name) end)
+	-- Click
+	wrap.MouseButton1Click:Connect(function()
+		switchPage(def.name)
+	end)
+
+	-- Hover
 	wrap.MouseEnter:Connect(function()
 		if currentPage ~= def.name then
-			tween(bg, { BackgroundColor3 = T.SURFACE2 })
-			tween(iconLbl, { TextColor3 = T.TEXT2 })
+			tween(bg, {BackgroundColor3=T.SURFACE2})
+			tween(iconLbl, {TextColor3=T.TEXT2})
 		end
+		-- Show tooltip
+		TooltipLabel.Text = def.name
+		NavTooltip.Visible = true
+		local absPos = bg.AbsolutePosition
+		NavTooltip.Position = UDim2.new(0, absPos.X + NAV_W - 2, 0, absPos.Y + 13)
+		tween(NavTooltip, {BackgroundTransparency=0}, EZ)
 	end)
+
 	wrap.MouseLeave:Connect(function()
 		if currentPage ~= def.name then
-			tween(bg, { BackgroundColor3 = T.SURFACE })
-			tween(iconLbl, { TextColor3 = T.TEXT3 })
+			tween(bg, {BackgroundColor3=T.SURFACE})
+			tween(iconLbl, {TextColor3=T.TEXT3})
 		end
+		NavTooltip.Visible = false
 	end)
+
+	-- Divider setelah item
+	if def.divAfter then
+		divOrder += 1
+		local div = newFrame(NavScroll, {
+			BG=T.BORDER, BT=0.6,
+			Size=UDim2.new(0,40,0,1),
+			ZIndex=12,
+		})
+		div.LayoutOrder = def.order * 2 + 1
+		local divPad = Instance.new("UIPadding",div)
+		divPad.PaddingTop=UDim.new(0,2); divPad.PaddingBottom=UDim.new(0,2)
+	end
+end
+
+-- ── Update glow dots khi switch ──
+local function updateNavDots()
+	for name, btn in pairs(navButtons) do
+		btn.glowDot.Visible = (name == currentPage)
+	end
+end
+
+-- Patch switchPage để cập nhật dots
+local _origSwitch = switchPage
+switchPage = function(name)
+	_origSwitch(name)
+	updateNavDots()
 end
 
 -- ══════════════════════════════════════════
--- PAGE FACTORY
+-- PAGE FACTORY  (giữ nguyên)
 -- ══════════════════════════════════════════
 local function makePage(name)
 	local scroll = Instance.new("ScrollingFrame", ContentArea)
-	scroll.Size = UDim2.new(1, 0, 1, 0)
-	scroll.BackgroundTransparency = 1
-	scroll.BorderSizePixel = 0
-	scroll.ScrollBarThickness = 3
-	scroll.ScrollBarImageColor3 = T.ACCENT
-	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	scroll.ZIndex = 11
-	scroll.Visible = false
+	scroll.Size                  = UDim2.new(1,0,1,0)
+	scroll.BackgroundTransparency= 1
+	scroll.BorderSizePixel       = 0
+	scroll.ScrollBarThickness    = 3
+	scroll.ScrollBarImageColor3  = T.ACCENT
+	scroll.CanvasSize            = UDim2.new(0,0,0,0)
+	scroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+	scroll.ZIndex                = 11
+	scroll.Visible               = false
 
 	local list = Instance.new("UIListLayout", scroll)
 	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Padding = UDim.new(0, 6)
+	list.Padding   = UDim.new(0,6)
 
 	local pad = Instance.new("UIPadding", scroll)
-	pad.PaddingTop    = UDim.new(0, 12)
-	pad.PaddingBottom = UDim.new(0, 16)
-	pad.PaddingLeft   = UDim.new(0, 10)
-	pad.PaddingRight  = UDim.new(0, 10)
+	pad.PaddingTop    = UDim.new(0,12)
+	pad.PaddingBottom = UDim.new(0,16)
+	pad.PaddingLeft   = UDim.new(0,10)
+	pad.PaddingRight  = UDim.new(0,10)
 
 	pages[name] = scroll
 	return scroll, list
 end
 
 -- ══════════════════════════════════════════
--- CARD COMPONENTS
+-- NOTIFICATION TOAST  (upgraded: position-aware, icon)
+-- ══════════════════════════════════════════
+local toastQ      = {}
+local toastActive = false
+
+local function showToast(text, kind)
+	table.insert(toastQ, {text=text, kind=kind or "info"})
+	if toastActive then return end
+	toastActive = true
+	task.spawn(function()
+		while #toastQ > 0 do
+			local t = table.remove(toastQ,1)
+			local col  = t.kind=="ok"   and T.SUCCESS
+				or t.kind=="warn" and T.WARN
+				or t.kind=="err"  and T.DANGER
+				or T.ACCENT
+			local icon = t.kind=="ok"   and "✓"
+				or t.kind=="warn" and "⚠"
+				or t.kind=="err"  and "✕"
+				or "ℹ"
+
+			local toast = newFrame(ScreenGui, {
+				BG   = Color3.fromRGB(14,14,26),
+				Size = UDim2.new(0,240,0,40),
+				Position = UDim2.new(0.5,-120,1,10),
+				ZIndex = 50,
+			})
+			corner(toast, 12)
+			stroke(toast, col, 1, 0.2)
+			gradient(toast,
+				Color3.fromRGB(18,18,32),
+				Color3.fromRGB(12,12,22), 180)
+
+			-- Color accent left bar
+			local bar = newFrame(toast, {
+				BG=col, Size=UDim2.new(0,3,1,-10),
+				Position=UDim2.new(0,0,0,5), ZIndex=51,
+			})
+			corner(bar,2)
+
+			-- Icon circle
+			local iconF = newFrame(toast, {
+				BG=col, BT=0.8,
+				Size=UDim2.new(0,24,0,24),
+				Position=UDim2.new(0,9,0.5,-12), ZIndex=51,
+			})
+			corner(iconF, 7)
+			newLabel(iconF, {
+				Text=icon, Color=col, Size=11, Font=Enum.Font.GothamBold,
+				AlignX=Enum.TextXAlignment.Center, ZIndex=52,
+			})
+
+			newLabel(toast, {
+				Text=t.text, Color=T.TEXT, Size=11,
+				Sz=UDim2.new(1,-46,1,0),
+				Position=UDim2.new(0,40,0,0),
+				ZIndex=51, Truncate=true,
+			})
+
+			tween(toast, {Position=UDim2.new(0.5,-120,1,-54)}, EZ_SPR)
+			task.wait(2.2)
+			tween(toast, {
+				Position=UDim2.new(0.5,-120,1,10),
+				BackgroundTransparency=1,
+			}, EZ_MED)
+			task.wait(0.4)
+			toast:Destroy()
+			task.wait(0.08)
+		end
+		toastActive = false
+	end)
+end
+
+-- ══════════════════════════════════════════
+-- OPEN / CLOSE
+-- ══════════════════════════════════════════
+local menuOpen = false
+
+local function openMenu()
+	if menuOpen then return end
+	menuOpen = true
+	tween(Panel,       {Position=UDim2.new(1,-PANEL_W,0,0)}, EZ_SLOW)
+	tween(BlurEffect,  {Size=10},                             EZ_SLOW)
+	if currentPage == nil then switchPage("Home") end
+end
+
+local function closeMenu()
+	if not menuOpen then return end
+	menuOpen = false
+	tween(Panel,      {Position=UDim2.new(1,0,0,0)}, EZ_SLOW)
+	tween(BlurEffect, {Size=0},                       EZ_SLOW)
+	NavTooltip.Visible = false
+end
+
+CloseBtn.MouseButton1Click:Connect(closeMenu)
+
+-- Minimize: collapse to just header
+local isMinimized = false
+MinBtn.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		tween(Panel, {Size=UDim2.new(0,PANEL_W,0,HEADER_H)}, EZ_MED)
+		MinBtn.Text = "□"
+	else
+		tween(Panel, {Size=UDim2.new(0,PANEL_W,1,0)}, EZ_MED)
+		MinBtn.Text = "—"
+	end
+end)
+
+-- ══════════════════════════════════════════
+-- TOGGLE BUTTON  v2.2 (draggable, animated)
+-- ══════════════════════════════════════════
+local ToggleBtn = Instance.new("TextButton", ScreenGui)
+ToggleBtn.Size            = UDim2.new(0,50,0,50)
+ToggleBtn.Position        = UDim2.new(1,-66,0,22)
+ToggleBtn.Text            = "N"
+ToggleBtn.TextSize        = 22
+ToggleBtn.Font            = Enum.Font.GothamBold
+ToggleBtn.TextColor3      = T.WHITE
+ToggleBtn.BackgroundColor3= T.ACCENT
+ToggleBtn.BorderSizePixel = 0
+ToggleBtn.ZIndex          = 9
+ToggleBtn.Visible         = false
+corner(ToggleBtn, 16)
+gradient(ToggleBtn, T.ACCENT, T.ACCENT2, 135)
+stroke(ToggleBtn, Color3.fromRGB(140,120,255), 1, 0.3)
+
+-- Outer glow ring
+local Ring = newFrame(ScreenGui, {
+	BG=T.ACCENT, BT=0.6,
+	Size=UDim2.new(0,50,0,50),
+	Position=UDim2.new(1,-66,0,22),
+	ZIndex=8,
+})
+corner(Ring, 16)
+Ring.Visible = false
+
+-- Badge (notification count, dùng khi muốn thêm badge)
+local Badge = newFrame(ToggleBtn, {
+	BG=T.DANGER,
+	Size=UDim2.new(0,14,0,14),
+	Position=UDim2.new(1,-4,0,-4),
+	ZIndex=10,
+})
+corner(Badge, 7)
+Badge.Visible = false
+local BadgeLbl = newLabel(Badge, {
+	Text="0", Color=T.WHITE, Size=8, Font=Enum.Font.GothamBold,
+	AlignX=Enum.TextXAlignment.Center, ZIndex=11,
+})
+
+-- Drag
+local dragOn, dragStart, btnStartPos = false, nil, nil
+ToggleBtn.InputBegan:Connect(function(i)
+	if i.UserInputType==Enum.UserInputType.MouseButton1
+		or i.UserInputType==Enum.UserInputType.Touch then
+		dragOn=true; dragStart=i.Position; btnStartPos=ToggleBtn.Position
+	end
+end)
+UserInputService.InputEnded:Connect(function(i)
+	if i.UserInputType==Enum.UserInputType.MouseButton1
+		or i.UserInputType==Enum.UserInputType.Touch then
+		dragOn=false
+	end
+end)
+UserInputService.InputChanged:Connect(function(i)
+	if dragOn and (i.UserInputType==Enum.UserInputType.MouseMovement
+		or i.UserInputType==Enum.UserInputType.Touch) then
+		local d  = i.Position - dragStart
+		local np = UDim2.new(
+			btnStartPos.X.Scale, btnStartPos.X.Offset + d.X,
+			btnStartPos.Y.Scale, btnStartPos.Y.Offset + d.Y
+		)
+		ToggleBtn.Position = np
+		Ring.Position      = np
+	end
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+	if menuOpen then closeMenu() else openMenu() end
+	-- Scale bounce
+	tween(ToggleBtn, {Size=UDim2.new(0,44,0,44)}, TweenInfo.new(0.1))
+	task.delay(0.12, function()
+		tween(ToggleBtn, {Size=UDim2.new(0,50,0,50)}, EZ_SPR)
+	end)
+end)
+
+ToggleBtn.MouseEnter:Connect(function()
+	tween(ToggleBtn, {BackgroundColor3=T.ACCENT2})
+	tween(Ring, {BackgroundTransparency=0.4})
+end)
+ToggleBtn.MouseLeave:Connect(function()
+	tween(ToggleBtn, {BackgroundColor3=T.ACCENT})
+	tween(Ring, {BackgroundTransparency=0.6})
+end)
+
+-- ══════════════════════════════════════════
+-- INTRO ANIMATION SEQUENCE
+-- ══════════════════════════════════════════
+task.spawn(function()
+
+	-- Phase 0: rings pulse in
+	OuterRing.BackgroundTransparency=1
+	InnerRing.BackgroundTransparency=1
+	LogoCard.BackgroundTransparency=1
+	NGlow.BackgroundTransparency=1
+	NLbl.TextTransparency=1
+
+	task.wait(0.1)
+
+	-- Outer ring zoom in
+	OuterRing.Size=UDim2.new(0,20,0,20)
+	OuterRing.Position=UDim2.new(0.5,-10,0.5,-50)
+	tween(OuterRing,{
+		Size=UDim2.new(0,180,0,180),
+		Position=UDim2.new(0.5,-90,0.5,-140),
+		BackgroundTransparency=0.85,
+	}, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	task.wait(0.12)
+
+	tween(InnerRing,{
+		Size=UDim2.new(0,140,0,140),
+		Position=UDim2.new(0.5,-70,0.5,-110),
+		BackgroundTransparency=0.88,
+	}, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	task.wait(0.1)
+
+	-- Logo card appear
+	LogoCard.Size=UDim2.new(0,60,0,60)
+	LogoCard.Position=UDim2.new(0.5,-30,0.5,-60)
+	tween(LogoCard,{
+		Size=UDim2.new(0,100,0,100),
+		Position=UDim2.new(0.5,-50,0.5,-90),
+		BackgroundTransparency=0,
+	}, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+
+	tween(NGlow,{BackgroundTransparency=0.7}, TweenInfo.new(0.4))
+	task.wait(0.25)
+
+	tween(NLbl,{TextTransparency=0}, TweenInfo.new(0.3))
+	task.wait(0.2)
+
+	-- Arc dots spin into place
+	for i,arc in ipairs(arcFrames) do
+		task.spawn(function()
+			arc.BackgroundTransparency=1
+			task.wait((i-1)*0.05)
+			tween(arc,{BackgroundTransparency=0.6}, TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out))
+		end)
+	end
+	task.wait(0.3)
+
+	-- Phase 1: wordmark slides up
+	WordmarkWrap.Position=UDim2.new(0.5,-140,0.5,60)
+	tween(WordmarkWrap,{Position=UDim2.new(0.5,-140,0.5,40)},
+	TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out))
+	tween(NovaText,{TextTransparency=0}, TweenInfo.new(0.35))
+	task.wait(0.2)
+
+	-- Subtitle items appear one by one
+	for i,sl in ipairs(subLabels) do
+		task.spawn(function()
+			task.wait((i-1)*0.05)
+			tween(sl,{TextTransparency=0},TweenInfo.new(0.25))
+		end)
+	end
+	task.wait(0.4)
+
+	-- Phase 2: progress bar + chips + status
+	tween(ProgressLbl,{TextTransparency=0},TweenInfo.new(0.3))
+
+	-- Spin the outer ring continuously
+	task.spawn(function()
+		local rot=0
+		while Splash and Splash.Parent do
+			task.wait(0.02)
+			rot=(rot+1.2)%360
+			for i,arc in ipairs(arcFrames) do
+				local ang=rot + (i-1)*72
+				arc.Position=UDim2.new(
+					0.5 + math.cos(math.rad(ang))*0.12 - 0.02,
+					math.cos(math.rad(ang))*2,
+					0.5 + math.sin(math.rad(ang))*0.12 - 0.12,
+					math.sin(math.rad(ang))*2 - 90
+				)
+			end
+		end
+	end)
+
+	-- Inner ring counter-spin (subtle pulse)
+	task.spawn(function()
+		while Splash and Splash.Parent do
+			tween(InnerRing,{BackgroundTransparency=0.82},
+			TweenInfo.new(0.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut))
+			task.wait(0.7)
+			tween(InnerRing,{BackgroundTransparency=0.92},
+			TweenInfo.new(0.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut))
+			task.wait(0.7)
+		end
+	end)
+
+	-- Progress + chips + status messages
+	local totalSteps = #FEATURES
+	for i,cf in ipairs(chipFrames) do
+		task.wait(0.18)
+
+		-- Update status label
+		if STATUS_MSGS[i] then
+			ProgressLbl.Text = STATUS_MSGS[i]
+		end
+
+		-- Reveal chip
+		tween(cf.frame,{BackgroundTransparency=0},
+		TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out))
+		tween(cf.label,{TextTransparency=0},TweenInfo.new(0.2))
+
+		-- Progress bar advance
+		local prog = i/totalSteps
+		tween(ProgressFill,{Size=UDim2.new(prog,0,1,0)},
+		TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
+	end
+
+	-- Final status
+	task.wait(0.18)
+	ProgressLbl.Text = STATUS_MSGS[#STATUS_MSGS]
+	tween(ProgressFill,{Size=UDim2.new(1,0,1,0)},
+	TweenInfo.new(0.2,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
+
+	-- Flash: all chips pulse white briefly
+	task.wait(0.25)
+	for _,cf in ipairs(chipFrames) do
+		tween(cf.frame,{BackgroundColor3=cf.color},TweenInfo.new(0.15))
+		tween(cf.label,{TextColor3=T.WHITE},TweenInfo.new(0.15))
+	end
+	task.wait(0.3)
+	for _,cf in ipairs(chipFrames) do
+		tween(cf.frame,{BackgroundColor3=Color3.fromRGB(14,14,28)},TweenInfo.new(0.3))
+		tween(cf.label,{TextColor3=cf.color},TweenInfo.new(0.3))
+	end
+
+	-- Phase 3: logo scale up briefly then fade out
+	task.wait(0.4)
+	tween(LogoCard,{
+		Size=UDim2.new(0,112,0,112),
+		Position=UDim2.new(0.5,-56,0.5,-96),
+	}, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	tween(NLbl,{TextTransparency=0.1,TextColor3=T.ACCENT},TweenInfo.new(0.2))
+
+	task.wait(0.22)
+
+	-- Phase 4: full screen flash then wipe out
+	local Flash = newFrame(Splash,{
+		BG=T.WHITE, BT=1,
+		Size=UDim2.new(1,0,1,0), ZIndex=50,
+	})
+	tween(Flash,{BackgroundTransparency=0.92},TweenInfo.new(0.12))
+	task.wait(0.12)
+	tween(Flash,{BackgroundTransparency=1},TweenInfo.new(0.3))
+
+	-- Wipe upward
+	tween(Splash,{
+		Position=UDim2.new(0,0,-1,0),
+		BackgroundTransparency=0.3,
+	}, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.In))
+
+	task.wait(0.5)
+	Splash:Destroy()
+
+	-- ── Show toggle button ──
+	ToggleBtn.Size    = UDim2.new(0,20,0,20)
+	ToggleBtn.Visible = true
+	Ring.Size         = UDim2.new(0,20,0,20)
+	Ring.Visible      = true
+	tween(ToggleBtn,{Size=UDim2.new(0,50,0,50)},
+	TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+	tween(Ring,{Size=UDim2.new(0,50,0,50)},
+	TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+
+	task.wait(0.3)
+	showToast("Nova UI v2.2  —  Ready ✓","ok")
+
+	-- Pulse ring loop
+	task.spawn(function()
+		while ToggleBtn and ToggleBtn.Parent do
+			task.wait(2.8)
+			if not menuOpen then
+				Ring.Size=UDim2.new(0,50,0,50)
+				Ring.Position=ToggleBtn.Position
+				Ring.BackgroundTransparency=0.5
+				tween(Ring,{
+					Size=UDim2.new(0,76,0,76),
+					Position=UDim2.new(
+						Ring.Position.X.Scale,
+						Ring.Position.X.Offset-13,
+						Ring.Position.Y.Scale,
+						Ring.Position.Y.Offset-13
+					),
+					BackgroundTransparency=1,
+				},TweenInfo.new(0.9,Enum.EasingStyle.Quad,Enum.EasingDirection.Out))
+				task.wait(0.9)
+			end
+		end
+	end)
+end)
+
+-- ══════════════════════════════════════════
+-- CARD / SECTION HELPERS  (dùng bởi pages)
 -- ══════════════════════════════════════════
 local function makeCard(parent, height, order)
 	local card = newFrame(parent, {
-		BG = T.SURFACE,
-		Size = UDim2.new(1, 0, 0, height),
+		BG   = T.SURFACE,
+		Size = UDim2.new(1,0,0,height),
 		ZIndex = 12,
 	})
 	corner(card, 12)
@@ -480,228 +1532,120 @@ end
 
 local function makeSectionLabel(parent, text, order)
 	local wrap = newFrame(parent, {
-		BG = Color3.fromRGB(0,0,0), BT = 1,
-		Size = UDim2.new(1, 0, 0, 22), ZIndex = 12,
+		BG=Color3.fromRGB(0,0,0), BT=1,
+		Size=UDim2.new(1,0,0,22), ZIndex=12,
 	})
 	wrap.LayoutOrder = order or 0
-
-	local line = newFrame(wrap, {
-		BG = T.BORDER,
-		Size = UDim2.new(1, -80, 0, 1),
-		Position = UDim2.new(0, 76, 0.5, 0),
-		ZIndex = 12,
+	newFrame(wrap, {
+		BG=T.BORDER,
+		Size=UDim2.new(1,-80,0,1),
+		Position=UDim2.new(0,76,0.5,0), ZIndex=12,
 	})
-
 	local lbl = newLabel(wrap, {
-		Text = "◈  " .. string.upper(text),
-		Color = T.ACCENT,
-		Size = 9,
-		Font = Enum.Font.GothamBold,
-		Sz = UDim2.new(0, 72, 1, 0),
-		ZIndex = 13,
+		Text="◈  "..string.upper(text),
+		Color=T.ACCENT, Size=9, Font=Enum.Font.GothamBold,
+		Sz=UDim2.new(0,72,1,0), ZIndex=13,
 	})
-	local pad = Instance.new("UIPadding", lbl)
-	pad.PaddingLeft = UDim.new(0, 2)
+	local p=Instance.new("UIPadding",lbl); p.PaddingLeft=UDim.new(0,2)
 	return wrap
 end
 
--- ══════════════════════════════════════════
--- TOGGLE
--- ══════════════════════════════════════════
 local function makeToggle(parent, labelText, default, onChange, order)
 	local row = newFrame(parent, {
-		BG = T.SURFACE,
-		Size = UDim2.new(1, 0, 0, 44),
-		ZIndex = 12,
+		BG=T.SURFACE, Size=UDim2.new(1,0,0,44), ZIndex=12,
 	})
-	corner(row, 10)
-	stroke(row, T.BORDER, 1)
+	corner(row,10); stroke(row,T.BORDER,1)
 	row.LayoutOrder = order or 0
 
 	newLabel(row, {
-		Text = labelText,
-		Color = T.TEXT,
-		Size = 13,
-		Sz = UDim2.new(1, -72, 1, 0),
-		Position = UDim2.new(0, 14, 0, 0),
-		ZIndex = 13,
+		Text=labelText, Color=T.TEXT, Size=13,
+		Sz=UDim2.new(1,-72,1,0), Position=UDim2.new(0,14,0,0), ZIndex=13,
 	})
 
-	local track = Instance.new("TextButton", row)
-	track.Size = UDim2.new(0, 42, 0, 22)
-	track.AnchorPoint = Vector2.new(1, 0.5)
-	track.Position = UDim2.new(1, -12, 0.5, 0)
-	track.BackgroundColor3 = default and T.ACCENT or T.SURFACE2
-	track.Text = ""
-	track.BorderSizePixel = 0
-	track.ZIndex = 13
-	corner(track, 12)
-	stroke(track, T.BORDER, 1)
-	if default then gradient(track, T.ACCENT, T.ACCENT2, 90) end
+	local track = Instance.new("TextButton",row)
+	track.Size=UDim2.new(0,42,0,22)
+	track.AnchorPoint=Vector2.new(1,0.5)
+	track.Position=UDim2.new(1,-12,0.5,0)
+	track.BackgroundColor3=default and T.ACCENT or T.SURFACE2
+	track.Text=""; track.BorderSizePixel=0; track.ZIndex=13
+	corner(track,12); stroke(track,T.BORDER,1)
+	if default then gradient(track,T.ACCENT,T.ACCENT2,90) end
 
-	local thumb = newFrame(track, {
-		BG = T.WHITE,
-		Size = UDim2.new(0, 16, 0, 16),
-		Position = default and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
-		ZIndex = 14,
+	local thumb=newFrame(track,{
+		BG=T.WHITE, Size=UDim2.new(0,16,0,16),
+		Position=default and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8),
+		ZIndex=14,
 	})
-	corner(thumb, 9)
+	corner(thumb,9)
 
-	local isOn = default
+	local isOn=default
 	local function toggle()
-		isOn = not isOn
+		isOn=not isOn
 		if isOn then
-			tween(track, { BackgroundColor3 = T.ACCENT })
-			gradient(track, T.ACCENT, T.ACCENT2, 90)
+			tween(track,{BackgroundColor3=T.ACCENT})
+			gradient(track,T.ACCENT,T.ACCENT2,90)
 		else
-			tween(track, { BackgroundColor3 = T.SURFACE2 })
+			tween(track,{BackgroundColor3=T.SURFACE2})
 		end
-		tween(thumb, { Position = isOn and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8) })
+		tween(thumb,{Position=isOn and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)})
 		if onChange then onChange(isOn) end
 	end
-
 	track.MouseButton1Click:Connect(toggle)
 	return row
 end
 
--- ══════════════════════════════════════════
--- SLIDER
--- ══════════════════════════════════════════
 local function makeSlider(parent, labelText, min, max, default, onChange, order)
-	local row = newFrame(parent, {
-		BG = T.SURFACE,
-		Size = UDim2.new(1, 0, 0, 58),
-		ZIndex = 12,
-	})
-	corner(row, 10)
-	stroke(row, T.BORDER, 1)
-	row.LayoutOrder = order or 0
+	local row=newFrame(parent,{BG=T.SURFACE,Size=UDim2.new(1,0,0,58),ZIndex=12})
+	corner(row,10); stroke(row,T.BORDER,1)
+	row.LayoutOrder=order or 0
 
-	newLabel(row, {
-		Text = labelText,
-		Color = T.TEXT,
-		Size = 12,
-		Sz = UDim2.new(1,-60,0,20),
-		Position = UDim2.new(0,14,0,6),
-		ZIndex = 13,
-	})
+	newLabel(row,{Text=labelText,Color=T.TEXT,Size=12,
+		Sz=UDim2.new(1,-60,0,20),Position=UDim2.new(0,14,0,6),ZIndex=13})
 
-	local valLbl = newLabel(row, {
-		Text = tostring(default),
-		Color = T.ACCENT,
-		Size = 12,
-		Font = Enum.Font.GothamBold,
-		Sz = UDim2.new(0,46,0,20),
-		Position = UDim2.new(1,-58,0,6),
-		AlignX = Enum.TextXAlignment.Right,
-		ZIndex = 13,
-	})
+	local valLbl=newLabel(row,{Text=tostring(default),Color=T.ACCENT,Size=12,
+		Font=Enum.Font.GothamBold,Sz=UDim2.new(0,46,0,20),
+		Position=UDim2.new(1,-58,0,6),AlignX=Enum.TextXAlignment.Right,ZIndex=13})
 
-	local track = newFrame(row, {
-		BG = T.SURFACE2,
-		Size = UDim2.new(1,-28,0,5),
-		Position = UDim2.new(0,14,0,38),
-		ZIndex = 13,
-	})
-	corner(track, 4)
-	stroke(track, T.BORDER, 1)
+	local track=newFrame(row,{BG=T.SURFACE2,Size=UDim2.new(1,-28,0,5),
+		Position=UDim2.new(0,14,0,38),ZIndex=13})
+	corner(track,4); stroke(track,T.BORDER,1)
 
-	local fill = newFrame(track, {
-		BG = T.ACCENT,
-		Size = UDim2.new((default-min)/(max-min),0,1,0),
-		ZIndex = 14,
-	})
-	corner(fill, 4)
-	gradient(fill, T.ACCENT, T.ACCENT2, 90)
+	local fill=newFrame(track,{BG=T.ACCENT,
+		Size=UDim2.new((default-min)/(max-min),0,1,0),ZIndex=14})
+	corner(fill,4); gradient(fill,T.ACCENT,T.ACCENT2,90)
 
-	local thumb = Instance.new("TextButton", track)
-	thumb.Size = UDim2.new(0,16,0,16)
-	thumb.AnchorPoint = Vector2.new(0.5,0.5)
-	thumb.Position = UDim2.new((default-min)/(max-min),0,0.5,0)
-	thumb.BackgroundColor3 = T.WHITE
-	thumb.Text = ""
-	thumb.BorderSizePixel = 0
-	thumb.ZIndex = 15
-	corner(thumb, 9)
-	stroke(thumb, T.ACCENT, 1)
+	local thumb=Instance.new("TextButton",track)
+	thumb.Size=UDim2.new(0,16,0,16)
+	thumb.AnchorPoint=Vector2.new(0.5,0.5)
+	thumb.Position=UDim2.new((default-min)/(max-min),0,0.5,0)
+	thumb.BackgroundColor3=T.WHITE; thumb.Text=""; thumb.BorderSizePixel=0; thumb.ZIndex=15
+	corner(thumb,9); stroke(thumb,T.ACCENT,1)
 
-	local drag = false
+	local drag=false
 	thumb.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			drag = true
-			tween(thumb, { Size = UDim2.new(0,20,0,20) })
+		if i.UserInputType==Enum.UserInputType.MouseButton1
+			or i.UserInputType==Enum.UserInputType.Touch then
+			drag=true; tween(thumb,{Size=UDim2.new(0,20,0,20)})
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			drag = false
-			tween(thumb, { Size = UDim2.new(0,16,0,16) })
+		if i.UserInputType==Enum.UserInputType.MouseButton1
+			or i.UserInputType==Enum.UserInputType.Touch then
+			drag=false; tween(thumb,{Size=UDim2.new(0,16,0,16)})
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(i)
-		if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-			local relX = math.clamp((i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-			local val  = math.floor(min + relX*(max-min))
-			fill.Size  = UDim2.new(relX,0,1,0)
-			thumb.Position = UDim2.new(relX,0,0.5,0)
-			valLbl.Text = tostring(val)
+		if drag and (i.UserInputType==Enum.UserInputType.MouseMovement
+			or i.UserInputType==Enum.UserInputType.Touch) then
+			local relX=math.clamp((i.Position.X-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
+			local val=math.floor(min+relX*(max-min))
+			fill.Size=UDim2.new(relX,0,1,0)
+			thumb.Position=UDim2.new(relX,0,0.5,0)
+			valLbl.Text=tostring(val)
 			if onChange then onChange(val) end
 		end
 	end)
-
 	return row, valLbl
-end
-
--- ══════════════════════════════════════════
--- NOTIFICATION TOAST
--- ══════════════════════════════════════════
-local toastQ = {}
-local toastActive = false
-
-local function showToast(text, kind)
-	table.insert(toastQ, {text=text, kind=kind or "info"})
-	if toastActive then return end
-	toastActive = true
-	task.spawn(function()
-		while #toastQ > 0 do
-			local t = table.remove(toastQ, 1)
-			local col = t.kind=="ok" and T.SUCCESS or t.kind=="warn" and T.WARN or t.kind=="err" and T.DANGER or T.ACCENT
-
-			local toast = newFrame(ScreenGui, {
-				BG = T.SURFACE,
-				Size = UDim2.new(0, 220, 0, 36),
-				Position = UDim2.new(0.5,-110,1,10),
-				ZIndex = 50,
-			})
-			corner(toast, 10)
-			stroke(toast, col, 1)
-
-			local bar = newFrame(toast, {
-				BG = col,
-				Size = UDim2.new(0,3,1,-8),
-				Position = UDim2.new(0,0,0,4),
-				ZIndex = 51,
-			})
-			corner(bar, 2)
-
-			newLabel(toast, {
-				Text = t.text,
-				Color = T.TEXT,
-				Size = 11,
-				Sz = UDim2.new(1,-10,1,0),
-				Position = UDim2.new(0,10,0,0),
-				ZIndex = 51,
-			})
-
-			tween(toast, { Position = UDim2.new(0.5,-110,1,-50) }, EZ_SPR)
-			task.wait(2.2)
-			tween(toast, { Position = UDim2.new(0.5,-110,1,10), BackgroundTransparency=1 }, EZ_MED)
-			task.wait(0.4)
-			toast:Destroy()
-			task.wait(0.1)
-		end
-		toastActive = false
-	end)
 end
 
 -- ══════════════════════════════════════════
@@ -4331,7 +5275,7 @@ do
 
 	-- ════════════════════════════════════════
 	-- KHỞI TẠO key
-	
+
 	-- ════════════════════════════════════════
 	rebuildKeybindRows()
 end
