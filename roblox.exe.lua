@@ -370,10 +370,12 @@ local navDefs = {
 	{ name = "GUIEdit",  icon = "✏",  order = 5 },
 	{ name = "Settings", icon = "⚙",  order = 6 },
 	{ name = "Display",  icon = "◫",  order = 7 },
-	{ name = "Perf",     icon = "📊", order = 8 },   -- Performance Monitor
-	{ name = "Console",  icon = "📝", order = 9 },   -- Console
-	{ name = "Keybinds", icon = "⌨",  order = 10 },  -- Keybind Manager
+	{ name = "Perf",     icon = "📊", order = 8 },-- Performance Monitor
+	{ name = "Console",  icon = "📝", order = 9 },
+	{ name = "AntiCheat", icon = "🛡", order = 10 },
+	{ name = "Keybinds", icon = "⌨",  order = 11},  -- Keybind Manager
 }
+
 
 
 for _, def in ipairs(navDefs) do
@@ -703,97 +705,658 @@ local function showToast(text, kind)
 end
 
 -- ══════════════════════════════════════════
--- ★ PAGE: HOME
+-- ★ PAGE: HOME  v3  (nâng cấp toàn diện)
 -- ══════════════════════════════════════════
 local homePage, _ = makePage("Home")
 
 do
 	local character = Player.Character or Player.CharacterAdded:Wait()
 	local humanoid  = character:WaitForChild("Humanoid")
+	local sessionStart = tick()
 
-	-- Profile card (glass)
-	local profCard = makeCard(homePage, 92, 1)
-	gradient(profCard, Color3.fromRGB(22,22,40), Color3.fromRGB(16,16,28), 135)
+	Player.CharacterAdded:Connect(function(char)
+		character = char
+		humanoid  = char:WaitForChild("Humanoid")
+	end)
+
+	local function getHum()
+		return character and character:FindFirstChildOfClass("Humanoid")
+	end
+	local function getRoot()
+		return character and character:FindFirstChild("HumanoidRootPart")
+	end
+
+	-- ════════════════════════════════════════
+	-- [1] PROFILE CARD  (glassmorphism nâng cao)
+	-- ════════════════════════════════════════
+	local profCard = makeCard(homePage, 104, 1)
+	gradient(profCard, Color3.fromRGB(20, 20, 44), Color3.fromRGB(14, 14, 28), 135)
+
+	-- Avatar + animated ring
+	local avatarRing = newFrame(profCard, {
+		BG = T.ACCENT,
+		Size = UDim2.new(0, 66, 0, 66),
+		Position = UDim2.new(0, 12, 0.5, -33),
+		ZIndex = 13,
+	})
+	corner(avatarRing, 33)
+	gradient(avatarRing, T.ACCENT, T.ACCENT2, 45)
 
 	local avatar = Instance.new("ImageLabel", profCard)
-	avatar.Size = UDim2.new(0,58,0,58)
-	avatar.Position = UDim2.new(0,14,0.5,-29)
+	avatar.Size = UDim2.new(0, 60, 0, 60)
+	avatar.Position = UDim2.new(0, 15, 0.5, -30)
 	avatar.BackgroundColor3 = T.SURFACE2
 	avatar.BorderSizePixel = 0
-	avatar.ZIndex = 13
+	avatar.ZIndex = 14
 	avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=150&height=150&format=png"
-	corner(avatar, 29)
-	stroke(avatar, T.ACCENT, 2)
+	corner(avatar, 30)
 
+	-- Online status dot
+	local onlineDot = newFrame(profCard, {
+		BG = T.SUCCESS,
+		Size = UDim2.new(0, 11, 0, 11),
+		Position = UDim2.new(0, 57, 0.5, 18),
+		ZIndex = 15,
+	})
+	corner(onlineDot, 6)
+	stroke(onlineDot, T.BG, 2)
+
+	-- Tên + handle
 	newLabel(profCard, {
 		Text = Player.DisplayName,
-		Color = T.TEXT, Size = 15,
+		Color = T.WHITE, Size = 15,
 		Font = Enum.Font.GothamBold,
-		Sz = UDim2.new(1,-100,0,24),
-		Position = UDim2.new(0,84,0,16), ZIndex=13, Truncate=true,
+		Sz = UDim2.new(1, -100, 0, 22),
+		Position = UDim2.new(0, 90, 0, 12), ZIndex = 14, Truncate = true,
 	})
-
 	newLabel(profCard, {
 		Text = "@"..Player.Name,
-		Color = T.TEXT3, Size = 11,
-		Sz = UDim2.new(1,-100,0,18),
-		Position = UDim2.new(0,84,0,40), ZIndex=13, Truncate=true,
+		Color = T.TEXT3, Size = 10,
+		Sz = UDim2.new(1, -100, 0, 16),
+		Position = UDim2.new(0, 90, 0, 34), ZIndex = 14, Truncate = true,
 	})
 
-	newLabel(profCard, {
-		Text = "  "..Player.AccountAge.." ngày tuổi",
-		Color = T.TEXT2, Size = 10,
-		Sz = UDim2.new(0,120,0,16),
-		Position = UDim2.new(0,84,0,60), ZIndex=13,
+	-- Badge: ID + tuổi tài khoản
+	local badgeRow = newFrame(profCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -100, 0, 18),
+		Position = UDim2.new(0, 90, 0, 52),
+		ZIndex = 14,
 	})
+	local badgeList = Instance.new("UIListLayout", badgeRow)
+	badgeList.FillDirection = Enum.FillDirection.Horizontal
+	badgeList.Padding = UDim.new(0, 6)
 
-	-- Stats grid
-	local statsCard = makeCard(homePage, 110, 2)
+	local function makeBadge(parent, text, bg, textCol, order)
+		local b = newFrame(parent, {
+			BG = bg, Size = UDim2.new(0, 10, 0, 16), ZIndex = 15,
+		})
+		b.AutomaticSize = Enum.AutomaticSize.X
+		b.LayoutOrder = order
+		corner(b, 5)
+		local lbl = newLabel(b, {
+			Text = text, Color = textCol, Size = 9,
+			Font = Enum.Font.GothamBold,
+			Sz = UDim2.new(0, 10, 1, 0), ZIndex = 16,
+		})
+		lbl.AutomaticSize = Enum.AutomaticSize.X
+		local p = Instance.new("UIPadding", lbl)
+		p.PaddingLeft = UDim.new(0, 5); p.PaddingRight = UDim.new(0, 5)
+		return b
+	end
+
+	makeBadge(badgeRow, "ID: "..Player.UserId, T.SURFACE2, T.TEXT2, 1)
+	makeBadge(badgeRow, "🕐 "..Player.AccountAge.." ngày", Color3.fromRGB(20,20,50), T.ACCENT, 2)
+	pcall(function()
+		if Player:GetRankInGroup(1) > 0 then
+			makeBadge(badgeRow, "👑 Member", Color3.fromRGB(20,20,50), T.WARN, 4)
+		end
+	end)
+	-- Verified badge nếu đây là account chính chủ
+	makeBadge(badgeRow, "✓ Online", Color3.fromRGB(8,32,16), T.SUCCESS, 3)
+
+	-- ════════════════════════════════════════
+	-- [2] STATS GRID  (6 cells đẹp hơn)
+	-- ════════════════════════════════════════
+	local statsCard = makeCard(homePage, 128, 2)
+	gradient(statsCard, Color3.fromRGB(16, 16, 32), Color3.fromRGB(12, 12, 22), 135)
 
 	local statDefs = {
-		{ icon="❤", label="HP",    col=0, row=0 },
-		{ icon="⚡", label="Speed", col=1, row=0 },
-		{ icon="📶", label="Ping",  col=0, row=1 },
-		{ icon="🏳", label="Team",  col=1, row=1 },
+		{ icon = "❤",  label = "Health",  col = 0, row = 0, color = T.DANGER,  key = "hp"    },
+		{ icon = "⚡",  label = "Speed",   col = 1, row = 0, color = T.ACCENT,  key = "speed" },
+		{ icon = "🏃",  label = "Jump",    col = 0, row = 1, color = T.ACCENT2, key = "jump"  },
+		{ icon = "📶",  label = "Ping",    col = 1, row = 1, color = T.SUCCESS, key = "ping"  },
+		{ icon = "⏱",  label = "Session", col = 0, row = 2, color = T.WARN,    key = "sess"  },
+		{ icon = "🏳",  label = "Team",    col = 1, row = 2, color = T.TEXT2,   key = "team"  },
 	}
 	local statValues = {}
+
 	for _, sd in ipairs(statDefs) do
 		local cell = newFrame(statsCard, {
 			BG = T.SURFACE2,
-			Size = UDim2.new(0,120,0,44),
-			Position = UDim2.new(0,10+sd.col*130,0,10+sd.row*50),
+			Size = UDim2.new(0, 126, 0, 36),
+			Position = UDim2.new(0, 8 + sd.col * 136, 0, 8 + sd.row * 40),
 			ZIndex = 13,
 		})
 		corner(cell, 9)
 		stroke(cell, T.BORDER, 1)
 
-		newLabel(cell, {Text=sd.icon,Color=T.TEXT3,Size=13,
-			Sz=UDim2.new(0,22,1,0),Position=UDim2.new(0,8,0,0),
-			AlignX=Enum.TextXAlignment.Center,ZIndex=14})
-		newLabel(cell, {Text=sd.label,Color=T.TEXT3,Size=9,Font=Enum.Font.GothamBold,
-			Sz=UDim2.new(1,-32,0,16),Position=UDim2.new(0,30,0,6),ZIndex=14})
-		local valL = newLabel(cell, {Text="…",Color=T.TEXT,Size=12,Font=Enum.Font.GothamBold,
-			Sz=UDim2.new(1,-32,0,18),Position=UDim2.new(0,30,0,22),ZIndex=14,Truncate=true})
-		statValues[sd.label] = valL
+		-- Left accent strip
+		local strip = newFrame(cell, {
+			BG = sd.color,
+			Size = UDim2.new(0, 3, 1, -10),
+			Position = UDim2.new(0, 0, 0, 5),
+			ZIndex = 14,
+		})
+		corner(strip, 2)
+
+		-- Icon
+		newLabel(cell, {
+			Text = sd.icon, Color = sd.color, Size = 13,
+			Sz = UDim2.new(0, 22, 1, 0),
+			Position = UDim2.new(0, 7, 0, 0),
+			AlignX = Enum.TextXAlignment.Center, ZIndex = 14,
+		})
+
+		-- Label
+		newLabel(cell, {
+			Text = sd.label, Color = T.TEXT3, Size = 8,
+			Font = Enum.Font.GothamBold,
+			Sz = UDim2.new(1, -32, 0, 14),
+			Position = UDim2.new(0, 28, 0, 4), ZIndex = 14,
+		})
+
+		-- Value
+		local valL = newLabel(cell, {
+			Text = "…", Color = T.TEXT, Size = 12,
+			Font = Enum.Font.GothamBold,
+			Sz = UDim2.new(1, -32, 0, 18),
+			Position = UDim2.new(0, 28, 0, 16),
+			ZIndex = 14, Truncate = true,
+		})
+		statValues[sd.key] = { label = valL, color = sd.color }
 	end
 
-	local function refreshStats()
-		statValues["HP"].Text    = math.floor(humanoid.Health).."/"..math.floor(humanoid.MaxHealth)
-		statValues["Speed"].Text = math.floor(humanoid.WalkSpeed).." st/s"
-		statValues["Team"].Text  = Player.Team and Player.Team.Name or "None"
-	end
-	refreshStats()
-	humanoid.HealthChanged:Connect(refreshStats)
+	-- HP bar nhỏ dưới health cell
+	local hpBarBg = newFrame(statsCard, {
+		BG = T.SURFACE,
+		Size = UDim2.new(0, 126, 0, 3),
+		Position = UDim2.new(0, 8, 0, 44),
+		ZIndex = 13,
+	})
+	corner(hpBarBg, 2)
+	local hpBarFill = newFrame(hpBarBg, {
+		BG = T.DANGER,
+		Size = UDim2.new(1, 0, 1, 0),
+		ZIndex = 14,
+	})
+	corner(hpBarFill, 2)
 
+	-- ════════════════════════════════════════
+	-- [3] POSITION TRACKER (XYZ realtime)
+	-- ════════════════════════════════════════
+	local posCard = makeCard(homePage, 58, 3)
+	gradient(posCard, Color3.fromRGB(10, 22, 36), Color3.fromRGB(8, 14, 24), 135)
+	stroke(posCard, T.ACCENT3, 1)
+
+	newLabel(posCard, {
+		Text = "📍 POSITION", Color = T.ACCENT3, Size = 8,
+		Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 80, 0, 16),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+
+	-- Copy position button
+	local copyPosBtn = Instance.new("TextButton", posCard)
+	copyPosBtn.Size = UDim2.new(0, 52, 0, 18)
+	copyPosBtn.Position = UDim2.new(1, -58, 0, 6)
+	copyPosBtn.Text = "📋 copy"
+	copyPosBtn.TextSize = 8
+	copyPosBtn.Font = Enum.Font.GothamBold
+	copyPosBtn.TextColor3 = T.ACCENT3
+	copyPosBtn.BackgroundColor3 = Color3.fromRGB(12, 28, 48)
+	copyPosBtn.BorderSizePixel = 0
+	copyPosBtn.ZIndex = 14
+	corner(copyPosBtn, 5)
+	stroke(copyPosBtn, T.ACCENT3, 1)
+
+	local xyzLabels = {}
+	local AXIS_COLORS = {
+		{ k = "X", col = T.DANGER  },
+		{ k = "Y", col = T.SUCCESS },
+		{ k = "Z", col = T.ACCENT3 },
+	}
+	for i, ax in ipairs(AXIS_COLORS) do
+		local xCell = newFrame(posCard, {
+			BG = T.SURFACE2,
+			Size = UDim2.new(0, 84, 0, 26),
+			Position = UDim2.new(0, 8 + (i-1)*92, 0, 26),
+			ZIndex = 13,
+		})
+		corner(xCell, 7)
+		stroke(xCell, ax.col, 1)
+		newLabel(xCell, {
+			Text = ax.k, Color = ax.col, Size = 10,
+			Font = Enum.Font.GothamBold,
+			Sz = UDim2.new(0, 20, 1, 0),
+			Position = UDim2.new(0, 5, 0, 0),
+			AlignX = Enum.TextXAlignment.Center, ZIndex = 14,
+		})
+		local vl = newLabel(xCell, {
+			Text = "0.0", Color = T.TEXT, Size = 10,
+			Font = Enum.Font.Code,
+			Sz = UDim2.new(1, -22, 1, 0),
+			Position = UDim2.new(0, 20, 0, 0),
+			AlignX = Enum.TextXAlignment.Center, ZIndex = 14,
+		})
+		xyzLabels[ax.k] = vl
+	end
+
+	local lastPos = Vector3.zero
+	copyPosBtn.MouseButton1Click:Connect(function()
+		copyText(string.format("Vector3.new(%.2f, %.2f, %.2f)", lastPos.X, lastPos.Y, lastPos.Z))
+		copyPosBtn.Text = "✓ ok"
+		tween(copyPosBtn, { TextColor3 = T.SUCCESS, BackgroundColor3 = Color3.fromRGB(8, 28, 16) })
+		task.delay(1.5, function()
+			copyPosBtn.Text = "📋 copy"
+			tween(copyPosBtn, { TextColor3 = T.ACCENT3, BackgroundColor3 = Color3.fromRGB(12, 28, 48) })
+		end)
+	end)
+
+	-- ════════════════════════════════════════
+	-- [4] QUICK ACTIONS (2×2 grid)
+	-- ════════════════════════════════════════
+	makeSectionLabel(homePage, "Quick Actions", 4)
+
+	local qaCard = makeCard(homePage, 86, 5)
+	gradient(qaCard, Color3.fromRGB(16, 16, 30), Color3.fromRGB(12, 12, 22), 135)
+
+	local QA_DEFS = {
+		{
+			icon = "🚩", label = "Teleport\nSpawn", col = 0,
+			color = T.ACCENT,
+			action = function()
+				local char = Player.Character
+				if not char then return end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+				if root and spawn then
+					root.CFrame = spawn.CFrame + Vector3.new(0,4,0)
+					showToast("Teleport → Spawn ✓", "ok")
+				else
+					showToast("Không tìm thấy Spawn", "warn")
+				end
+			end,
+		},
+		{
+			icon = "↩", label = "Reset\nCharacter", col = 1,
+			color = T.WARN,
+			action = function()
+				local h = getHum()
+				if h then h.Health = 0; showToast("Reset character…", "warn") end
+			end,
+		},
+		{
+			icon = "👻", label = "NoClip\nToggle", col = 2,
+			color = T.ACCENT2,
+			action = function()
+				_G._HomeNoClipOn = not _G._HomeNoClipOn
+				if _G._HomeNoClipOn then
+					_G._HomeNoClipConn = RunService.Stepped:Connect(function()
+						if Player.Character then
+							for _, p in ipairs(Player.Character:GetDescendants()) do
+								if p:IsA("BasePart") then p.CanCollide = false end
+							end
+						end
+					end)
+					showToast("NoClip ON 👻", "ok")
+				else
+					if _G._HomeNoClipConn then _G._HomeNoClipConn:Disconnect(); _G._HomeNoClipConn = nil end
+					if Player.Character then
+						for _, p in ipairs(Player.Character:GetDescendants()) do
+							if p:IsA("BasePart") then p.CanCollide = true end
+						end
+					end
+					showToast("NoClip OFF", "warn")
+				end
+			end,
+		},
+		{
+			icon = "💎", label = "Copy\nPosition", col = 3,
+			color = T.SUCCESS,
+			action = function()
+				local root = getRoot()
+				if root then
+					copyText(string.format("Vector3.new(%.2f, %.2f, %.2f)",
+						root.Position.X, root.Position.Y, root.Position.Z))
+					showToast("Đã copy Position ✓", "ok")
+				end
+			end,
+		},
+	}
+
+	local qaToggles = {} -- để update UI khi toggle
+
+	for _, qa in ipairs(QA_DEFS) do
+		local btn = Instance.new("TextButton", qaCard)
+		btn.Size = UDim2.new(0, 64, 0, 70)
+		btn.Position = UDim2.new(0, 8 + qa.col * 70, 0, 8)
+		btn.Text = ""
+		btn.BackgroundColor3 = T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 13
+		corner(btn, 12)
+		stroke(btn, T.BORDER, 1)
+
+		local iconLbl = newLabel(btn, {
+			Text = qa.icon, Size = 20,
+			AlignX = Enum.TextXAlignment.Center,
+			Sz = UDim2.new(1, 0, 0, 32),
+			Position = UDim2.new(0, 0, 0, 8), ZIndex = 14,
+		})
+		newLabel(btn, {
+			Text = qa.label, Color = T.TEXT2, Size = 8,
+			Font = Enum.Font.GothamBold,
+			AlignX = Enum.TextXAlignment.Center,
+			Sz = UDim2.new(1, 0, 0, 24),
+			Position = UDim2.new(0, 0, 0, 40),
+			ZIndex = 14, Wrapped = true,
+		})
+
+		-- Bottom accent strip
+		local strip = newFrame(btn, {
+			BG = qa.color,
+			Size = UDim2.new(1, -16, 0, 2),
+			Position = UDim2.new(0, 8, 1, -6),
+			ZIndex = 14,
+		})
+		corner(strip, 1)
+
+		if qa.label:find("NoClip") then
+			qaToggles["noclip"] = { btn = btn, strip = strip, color = qa.color }
+		end
+
+		btn.MouseEnter:Connect(function()
+			tween(btn, { BackgroundColor3 = Color3.fromRGB(30, 30, 55) })
+			tween(strip, { BackgroundColor3 = qa.color })
+		end)
+		btn.MouseLeave:Connect(function()
+			local isOn = (qa.label:find("NoClip") and _G._HomeNoClipOn)
+			tween(btn, { BackgroundColor3 = isOn and Color3.fromRGB(26, 18, 50) or T.SURFACE2 })
+		end)
+		btn.MouseButton1Click:Connect(function()
+			tween(btn, { BackgroundColor3 = T.SURFACE })
+			qa.action()
+			-- Update NoClip visual state
+			if qa.label:find("NoClip") then
+				local on = _G._HomeNoClipOn
+				tween(btn, { BackgroundColor3 = on and Color3.fromRGB(26, 18, 50) or T.SURFACE2 })
+				stroke(btn, on and T.ACCENT2 or T.BORDER, on and 1.5 or 1)
+			end
+		end)
+	end
+
+	-- ════════════════════════════════════════
+	-- [5] PLAYERS IN SERVER (mini list + count)
+	-- ════════════════════════════════════════
+	makeSectionLabel(homePage, "Players Online", 6)
+
+	local playersInfoCard = makeCard(homePage, 10, 7)
+	playersInfoCard.AutomaticSize = Enum.AutomaticSize.Y
+
+	-- Count badge
+	local playerCountBadge = newFrame(playersInfoCard, {
+		BG = T.ACCENT,
+		Size = UDim2.new(0, 0, 0, 20),
+		Position = UDim2.new(1, -8, 0, 8),
+		ZIndex = 13,
+	})
+	playerCountBadge.AutomaticSize = Enum.AutomaticSize.X
+	playerCountBadge.AnchorPoint = Vector2.new(1, 0)
+	corner(playerCountBadge, 6)
+	gradient(playerCountBadge, T.ACCENT, T.ACCENT2, 90)
+	local countBadgeLbl = newLabel(playerCountBadge, {
+		Text = "0/0", Color = T.WHITE, Size = 10,
+		Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 10, 1, 0), ZIndex = 14,
+	})
+	countBadgeLbl.AutomaticSize = Enum.AutomaticSize.X
+	local cbPad = Instance.new("UIPadding", countBadgeLbl)
+	cbPad.PaddingLeft = UDim.new(0, 8); cbPad.PaddingRight = UDim.new(0, 8)
+
+	-- Mini player list
+	local miniPlayerList = Instance.new("UIListLayout", playersInfoCard)
+	miniPlayerList.SortOrder = Enum.SortOrder.LayoutOrder
+	miniPlayerList.Padding = UDim.new(0, 2)
+	local mlPad = Instance.new("UIPadding", playersInfoCard)
+	mlPad.PaddingTop = UDim.new(0, 36); mlPad.PaddingBottom = UDim.new(0, 6)
+	mlPad.PaddingLeft = UDim.new(0, 8); mlPad.PaddingRight = UDim.new(0, 8)
+
+	local miniPlayerRows = {}
+
+	local function rebuildMiniPlayers()
+		for _, row in pairs(miniPlayerRows) do
+			if row and row.Parent then row:Destroy() end
+		end
+		miniPlayerRows = {}
+
+		local all = Players:GetPlayers()
+		local maxGame = Players.MaxPlayers
+		countBadgeLbl.Text = #all.."/"..maxGame
+
+		for i, p in ipairs(all) do
+			local row = Instance.new("TextButton", playersInfoCard)
+			row.Size = UDim2.new(1, 0, 0, 28)
+			row.BackgroundColor3 = p == Player and Color3.fromRGB(16, 20, 48) or T.SURFACE2
+			row.BackgroundTransparency = 0.4
+			row.Text = ""
+			row.BorderSizePixel = 0
+			row.ZIndex = 13
+			row.LayoutOrder = i
+			corner(row, 7)
+			if p == Player then stroke(row, T.ACCENT, 1) end
+
+			-- Mini avatar
+			local av = Instance.new("ImageLabel", row)
+			av.Size = UDim2.new(0, 20, 0, 20)
+			av.Position = UDim2.new(0, 4, 0.5, -10)
+			av.BackgroundColor3 = T.SURFACE
+			av.BorderSizePixel = 0
+			av.ZIndex = 14
+			av.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..p.UserId.."&width=48&height=48&format=png"
+			corner(av, 10)
+
+			-- You badge
+			if p == Player then
+				newLabel(row, {
+					Text = "● YOU", Color = T.ACCENT, Size = 8,
+					Font = Enum.Font.GothamBold,
+					Sz = UDim2.new(0, 36, 1, 0),
+					Position = UDim2.new(0, 28, 0, 0), ZIndex = 14,
+				})
+			else
+				newLabel(row, {
+					Text = p.DisplayName, Color = T.TEXT, Size = 10,
+					Font = Enum.Font.GothamBold,
+					Sz = UDim2.new(1, -120, 1, 0),
+					Position = UDim2.new(0, 28, 0, 0), ZIndex = 14, Truncate = true,
+				})
+			end
+
+			-- Team badge
+			if p.Team then
+				local teamBadge = newFrame(row, {
+					BG = p.Team.TeamColor and Color3.fromRGB(
+						p.Team.TeamColor.R * 255,
+						p.Team.TeamColor.G * 255,
+						p.Team.TeamColor.B * 255
+					) or T.BORDER,
+					Size = UDim2.new(0, 6, 0, 20),
+					Position = UDim2.new(1, -10, 0.5, -10),
+					ZIndex = 14,
+				})
+				corner(teamBadge, 3)
+			end
+
+			-- Ping dot (màu dựa vào ping)
+			local pingDot = newFrame(row, {
+				BG = T.TEXT3,
+				Size = UDim2.new(0, 6, 0, 6),
+				Position = UDim2.new(1, -22, 0.5, -3),
+				ZIndex = 14,
+			})
+			corner(pingDot, 3)
+
+			row.MouseEnter:Connect(function() tween(row, {BackgroundTransparency = 0.1}) end)
+			row.MouseLeave:Connect(function() tween(row, {BackgroundTransparency = 0.4}) end)
+
+			table.insert(miniPlayerRows, row)
+		end
+	end
+	rebuildMiniPlayers()
+	Players.PlayerAdded:Connect(function() task.wait(0.5); rebuildMiniPlayers() end)
+	Players.PlayerRemoving:Connect(function() task.wait(0.1); rebuildMiniPlayers() end)
+
+	-- ════════════════════════════════════════
+	-- [6] ABOUT NOVA CARD
+	-- ════════════════════════════════════════
+	makeSectionLabel(homePage, "About", 8)
+
+	local aboutCard = makeCard(homePage, 64, 9)
+	gradient(aboutCard, Color3.fromRGB(14, 14, 30), Color3.fromRGB(10, 10, 20), 135)
+
+	-- Logo mini
+	local logoGlow = newFrame(aboutCard, {
+		BG = T.ACCENT, BT = 0.85,
+		Size = UDim2.new(0, 44, 0, 44),
+		Position = UDim2.new(0, 10, 0.5, -22),
+		ZIndex = 13,
+	})
+	corner(logoGlow, 12)
+	gradient(logoGlow, T.ACCENT, T.ACCENT2, 135)
+
+	newLabel(logoGlow, {
+		Text = "N", Color = T.WHITE, Size = 20,
+		Font = Enum.Font.GothamBold,
+		AlignX = Enum.TextXAlignment.Center,
+		Sz = UDim2.new(1, 0, 1, 0), ZIndex = 14,
+	})
+
+	newLabel(aboutCard, {
+		Text = "NOVA UI  v2.1",
+		Color = T.WHITE, Size = 13, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, -70, 0, 20),
+		Position = UDim2.new(0, 62, 0, 10), ZIndex = 13,
+	})
+	newLabel(aboutCard, {
+		Text = "Glassmorphism executor interface",
+		Color = T.TEXT3, Size = 9,
+		Sz = UDim2.new(1, -70, 0, 16),
+		Position = UDim2.new(0, 62, 0, 28), ZIndex = 13,
+	})
+
+	-- Version tags
+	local tagRow = newFrame(aboutCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -70, 0, 16),
+		Position = UDim2.new(0, 62, 0, 44),
+		ZIndex = 13,
+	})
+	local tagRowLayout = Instance.new("UIListLayout", tagRow)
+	tagRowLayout.FillDirection = Enum.FillDirection.Horizontal
+	tagRowLayout.Padding = UDim.new(0, 5)
+
+	for _, tag in ipairs({"Spy", "Explorer", "Console", "Perf"}) do
+		local tb = newFrame(tagRow, {
+			BG = Color3.fromRGB(20, 20, 48),
+			Size = UDim2.new(0, 10, 0, 14), ZIndex = 14,
+		})
+		tb.AutomaticSize = Enum.AutomaticSize.X
+		corner(tb, 4)
+		stroke(tb, T.BORDER, 1)
+		local tl = newLabel(tb, {
+			Text = tag, Color = T.ACCENT, Size = 8,
+			Font = Enum.Font.GothamBold,
+			Sz = UDim2.new(0, 10, 1, 0), ZIndex = 15,
+		})
+		tl.AutomaticSize = Enum.AutomaticSize.X
+		local tp2 = Instance.new("UIPadding", tl)
+		tp2.PaddingLeft = UDim.new(0, 5); tp2.PaddingRight = UDim.new(0, 5)
+	end
+
+	-- ════════════════════════════════════════
+	-- LIVE UPDATE LOOP
+	-- ════════════════════════════════════════
 	task.spawn(function()
 		while true do
-			task.wait(2)
+			task.wait(0.5)
+
+			-- Stats
+			local hum = getHum()
+			local root = getRoot()
+
+			if hum then
+				local hp    = math.floor(hum.Health)
+				local maxHp = math.floor(hum.MaxHealth)
+				local hpRatio = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+
+				statValues["hp"].label.Text = hp.."/"..maxHp
+				local hpCol = hpRatio > 0.6 and T.SUCCESS or hpRatio > 0.3 and T.WARN or T.DANGER
+				tween(statValues["hp"].label, { TextColor3 = hpCol })
+				tween(hpBarFill, { Size = UDim2.new(hpRatio, 0, 1, 0), BackgroundColor3 = hpCol })
+
+				statValues["speed"].label.Text = math.floor(hum.WalkSpeed).." st/s"
+				statValues["jump"].label.Text  = math.floor(hum.JumpPower or hum.JumpHeight or 50)
+			end
+
+			-- Position
+			if root then
+				local pos = root.Position
+				lastPos = pos
+				xyzLabels["X"].Text = string.format("%.1f", pos.X)
+				xyzLabels["Y"].Text = string.format("%.1f", pos.Y)
+				xyzLabels["Z"].Text = string.format("%.1f", pos.Z)
+			end
+
+			-- Session timer
+			local elapsed = tick() - sessionStart
+			local m = math.floor(elapsed / 60)
+			local s = math.floor(elapsed % 60)
+			statValues["sess"].label.Text = string.format("%02d:%02d", m, s)
+
+			-- Team
+			if Player.Team then
+				statValues["team"].label.Text = Player.Team.Name
+				local tc = Player.Team.TeamColor
+				if tc then
+					tween(statValues["team"].label, {
+						TextColor3 = Color3.fromRGB(tc.R*255, tc.G*255, tc.B*255)
+					})
+				end
+			else
+				statValues["team"].label.Text = "None"
+			end
+
+			task.wait(1.5)
+
+			-- Ping (ít tốn hơn nếu update chậm)
 			local ok, p = pcall(function() return math.floor(Player:GetNetworkPing()*1000) end)
-			if ok then statValues["Ping"].Text = p.." ms" end
+			if ok then
+				statValues["ping"].label.Text = p.." ms"
+				local pingCol = p < 80 and T.SUCCESS or p < 200 and T.WARN or T.DANGER
+				tween(statValues["ping"].label, { TextColor3 = pingCol })
+			end
+
+			-- NoClip visual state sync
+			if qaToggles["noclip"] then
+				local on = _G._HomeNoClipOn
+				tween(qaToggles["noclip"].btn, {
+					BackgroundColor3 = on and Color3.fromRGB(26, 18, 50) or T.SURFACE2
+				})
+			end
 		end
 	end)
 end
-
 -- ══════════════════════════════════════════
 -- ★ PAGE: PLAYERS
 -- ══════════════════════════════════════════
@@ -4299,6 +4862,446 @@ do
 		b.MouseEnter:Connect(function() tween(b,{BackgroundColor3=T.SURFACE}) end)
 		b.MouseLeave:Connect(function() tween(b,{BackgroundColor3=T.SURFACE2}) end)
 	end
+end
+
+-- ══════════════════════════════════════════
+-- ★ PAGE: ANTI-CHEAT BYPASS
+-- ══════════════════════════════════════════
+local antiCheatPage, _ = makePage("AntiCheat")
+
+do
+	-- ════════════════════════════════════════
+	-- SECTION 1: CÁC NÚT MẶC ĐỊNH
+	-- ════════════════════════════════════════
+	makeSectionLabel(antiCheatPage, "Bypass Mặc Định", 1)
+
+	-- Anti-Speed Check
+	makeToggle(antiCheatPage, "Anti Speed Check 🏃", false, function(on)
+		_G._NovaAntiSpeed = on
+		if on then
+			_G._NovaAntiSpeedConn = RunService.Heartbeat:Connect(function()
+				local char = Player.Character
+				if not char then return end
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum and hum.WalkSpeed > 16 then
+					-- Giả lập speed hợp lệ về phía server
+					pcall(function()
+						hum:SetAttribute("_NovaRealSpeed", hum.WalkSpeed)
+					end)
+				end
+			end)
+			showToast("Anti Speed Check ON 🛡", "ok")
+		else
+			if _G._NovaAntiSpeedConn then
+				_G._NovaAntiSpeedConn:Disconnect()
+				_G._NovaAntiSpeedConn = nil
+			end
+			showToast("Anti Speed Check OFF", "warn")
+		end
+	end, 2)
+
+	-- Anti-Fly Detection
+	makeToggle(antiCheatPage, "Anti Fly Detection ✈", false, function(on)
+		_G._NovaAntiFly = on
+		if on then
+			_G._NovaAntiFlyConn = RunService.Heartbeat:Connect(function()
+				local char = Player.Character
+				if not char then return end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				local hum  = char:FindFirstChildOfClass("Humanoid")
+				if root and hum then
+					-- Giữ trạng thái Seated để qua một số AC đơn giản
+					pcall(function()
+						if _G._NovaFlying then
+							hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+							hum:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+						end
+					end)
+				end
+			end)
+			showToast("Anti Fly Detection ON 🛡", "ok")
+		else
+			if _G._NovaAntiFlyConn then
+				_G._NovaAntiFlyConn:Disconnect()
+				_G._NovaAntiFlyConn = nil
+			end
+			-- Re-enable states
+			local char = Player.Character
+			if char then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum then
+					pcall(function()
+						hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+						hum:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+					end)
+				end
+			end
+			showToast("Anti Fly Detection OFF", "warn")
+		end
+	end, 3)
+
+	-- Anti-Teleport Detection
+	makeToggle(antiCheatPage, "Anti Teleport Detection 📍", false, function(on)
+		_G._NovaAntiTP = on
+		if on then
+			-- Teleport dần dần thay vì nhảy thẳng
+			_G._NovaTeleportSafe = function(targetCFrame)
+				local char = Player.Character
+				if not char then return end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if not root then return end
+
+				local startPos = root.Position
+				local endPos   = targetCFrame.Position
+				local dist     = (endPos - startPos).Magnitude
+				local steps    = math.max(math.floor(dist / 20), 3)
+
+				task.spawn(function()
+					for i = 1, steps do
+						if not _G._NovaAntiTP then break end
+						local alpha = i / steps
+						root.CFrame = CFrame.new(
+							startPos:Lerp(endPos, alpha)
+						)
+						task.wait(0.05)
+					end
+					root.CFrame = targetCFrame
+				end)
+			end
+			showToast("Anti TP Detection ON — dùng _G._NovaTeleportSafe(CFrame)", "ok")
+		else
+			_G._NovaTeleportSafe = nil
+			showToast("Anti TP Detection OFF", "warn")
+		end
+	end, 4)
+
+	-- Anti-Noclip Detection
+	makeToggle(antiCheatPage, "Anti NoClip Detection 👻", false, function(on)
+		_G._NovaAntiNCDetect = on
+		if on then
+			-- Thay vì tắt hoàn toàn collision, chỉ tắt với BasePart không phải terrain
+			_G._NovaAntiNCConn = RunService.Stepped:Connect(function()
+				if not _G._NovaAntiNCDetect then return end
+				local char = Player.Character
+				if not char then return end
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+						p.CanCollide = false
+						-- HRP vẫn collide để tránh bị detect
+					end
+				end
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then hrp.CanCollide = true end
+			end)
+			showToast("Anti NoClip Detection ON 🛡", "ok")
+		else
+			if _G._NovaAntiNCConn then
+				_G._NovaAntiNCConn:Disconnect()
+				_G._NovaAntiNCConn = nil
+			end
+			local char = Player.Character
+			if char then
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") then p.CanCollide = true end
+				end
+			end
+			showToast("Anti NoClip Detection OFF", "warn")
+		end
+	end, 5)
+
+	-- Anti-Kick (block kick remotes)
+	makeToggle(antiCheatPage, "Anti Kick 🔒", false, function(on)
+		_G._NovaAntiKick = on
+		if on then
+			pcall(function()
+				local oldNamecall
+				oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+					if _G._NovaAntiKick then
+						local method = getnamecallmethod()
+						if method == "Kick" and self == Player then
+							showToast("Kick đã bị chặn! 🛡", "ok")
+							return  -- block
+						end
+					end
+					return oldNamecall(self, ...)
+				end)
+			end)
+			showToast("Anti Kick ON 🔒", "ok")
+		else
+			showToast("Anti Kick OFF (cần re-inject để tắt hook)", "warn")
+		end
+	end, 6)
+
+	-- Anti-Respawn Lock
+	makeToggle(antiCheatPage, "Giữ Vị Trí Khi Respawn 📌", false, function(on)
+		if on then
+			_G._NovaRespawnPos = nil
+			_G._NovaRespawnConn = Player.CharacterAdded:Connect(function(char)
+				if _G._NovaRespawnPos then
+					local saved = _G._NovaRespawnPos
+					task.wait(0.5)
+					local root = char:WaitForChild("HumanoidRootPart", 5)
+					if root then root.CFrame = saved end
+				end
+			end)
+			-- Lưu vị trí hiện tại
+			local char = Player.Character
+			if char then
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if root then _G._NovaRespawnPos = root.CFrame end
+			end
+			showToast("Giữ vị trí respawn ON 📌", "ok")
+		else
+			if _G._NovaRespawnConn then
+				_G._NovaRespawnConn:Disconnect()
+				_G._NovaRespawnConn = nil
+			end
+			_G._NovaRespawnPos = nil
+			showToast("Giữ vị trí respawn OFF", "warn")
+		end
+	end, 7)
+
+	-- ════════════════════════════════════════
+	-- SECTION 2: TÙY CHỈNH (Custom)
+	-- ════════════════════════════════════════
+	makeSectionLabel(antiCheatPage, "Tùy Chỉnh", 8)
+
+	-- Info banner
+	local customBanner = newFrame(antiCheatPage, {
+		BG = Color3.fromRGB(16, 20, 40),
+		Size = UDim2.new(1, 0, 0, 32),
+		ZIndex = 12,
+	})
+	customBanner.LayoutOrder = 9
+	corner(customBanner, 10)
+	stroke(customBanner, T.ACCENT, 1)
+	newLabel(customBanner, {
+		Text = "  ℹ Các tùy chọn dưới đây cần chỉnh tay theo từng game",
+		Color = T.ACCENT, Size = 10,
+		Sz = UDim2.new(1, -10, 1, 0),
+		Position = UDim2.new(0, 10, 0, 0),
+		ZIndex = 13,
+	})
+
+	-- Custom RemoteEvent Blocker
+	local blockCard = makeCard(antiCheatPage, 80, 10)
+	gradient(blockCard, Color3.fromRGB(16, 16, 32), Color3.fromRGB(10, 10, 20), 135)
+
+	newLabel(blockCard, {
+		Text = "🚫 Chặn RemoteEvent theo tên",
+		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+	newLabel(blockCard, {
+		Text = "Nhập tên remote cần chặn (AC report, ban event…)",
+		Color = T.TEXT3, Size = 9,
+		Sz = UDim2.new(1, -20, 0, 16),
+		Position = UDim2.new(0, 12, 0, 24), ZIndex = 13,
+	})
+
+	local blockBox = Instance.new("TextBox", blockCard)
+	blockBox.Size = UDim2.new(1, -72, 0, 24)
+	blockBox.Position = UDim2.new(0, 10, 1, -32)
+	blockBox.BackgroundColor3 = T.SURFACE2
+	blockBox.BorderSizePixel = 0
+	blockBox.TextColor3 = T.TEXT
+	blockBox.PlaceholderText = "e.g. ReportPlayer, BanEvent"
+	blockBox.PlaceholderColor3 = T.TEXT3
+	blockBox.Text = ""
+	blockBox.TextSize = 11
+	blockBox.Font = Enum.Font.Gotham
+	blockBox.ClearTextOnFocus = false
+	blockBox.ZIndex = 13
+	corner(blockBox, 7)
+	stroke(blockBox, T.BORDER, 1)
+	local bbPad = Instance.new("UIPadding", blockBox)
+	bbPad.PaddingLeft = UDim.new(0, 8)
+
+	local blockAddBtn = Instance.new("TextButton", blockCard)
+	blockAddBtn.Size = UDim2.new(0, 52, 0, 24)
+	blockAddBtn.Position = UDim2.new(1, -60, 1, -32)
+	blockAddBtn.Text = "+ Block"
+	blockAddBtn.TextSize = 10
+	blockAddBtn.Font = Enum.Font.GothamBold
+	blockAddBtn.TextColor3 = T.WHITE
+	blockAddBtn.BackgroundColor3 = T.DANGER
+	blockAddBtn.BorderSizePixel = 0
+	blockAddBtn.ZIndex = 13
+	corner(blockAddBtn, 7)
+
+	_G._NovaBlockedRemotes = _G._NovaBlockedRemotes or {}
+
+	blockAddBtn.MouseButton1Click:Connect(function()
+		local name = blockBox.Text:match("^%s*(.-)%s*$")
+		if name == "" then showToast("Nhập tên remote!", "warn"); return end
+		_G._NovaBlockedRemotes[name] = true
+		showToast("Đã chặn remote: " .. name, "ok")
+		blockBox.Text = ""
+
+		-- Hook nếu chưa
+		pcall(function()
+			if not _G._NovaRemoteBlockHooked then
+				_G._NovaRemoteBlockHooked = true
+				local oldNC
+				oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+					if _G._NovaBlockedRemotes[self.Name] then
+						local method = getnamecallmethod()
+						if method == "FireServer" or method == "InvokeServer" then
+							showToast("Blocked: " .. self.Name, "warn")
+							return  -- chặn fire
+						end
+					end
+					return oldNC(self, ...)
+				end)
+			end
+		end)
+	end)
+
+	-- Whitelist / Safe Position
+	local safeCard = makeCard(antiCheatPage, 80, 11)
+	gradient(safeCard, Color3.fromRGB(14, 22, 14), Color3.fromRGB(10, 14, 10), 135)
+	stroke(safeCard, T.SUCCESS, 1)
+
+	newLabel(safeCard, {
+		Text = "📌 Safe Position (lưu & teleport về)",
+		Color = T.SUCCESS, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+
+	local safePosLbl = newLabel(safeCard, {
+		Text = "Chưa lưu vị trí",
+		Color = T.TEXT3, Size = 9,
+		Sz = UDim2.new(1, -20, 0, 16),
+		Position = UDim2.new(0, 12, 0, 26), ZIndex = 13,
+	})
+
+	local savedSafePos = nil
+
+	local savePosBtn = Instance.new("TextButton", safeCard)
+	savePosBtn.Size = UDim2.new(0, 100, 0, 26)
+	savePosBtn.Position = UDim2.new(0, 10, 1, -34)
+	savePosBtn.Text = "💾 Lưu vị trí"
+	savePosBtn.TextSize = 10
+	savePosBtn.Font = Enum.Font.GothamBold
+	savePosBtn.TextColor3 = T.WHITE
+	savePosBtn.BackgroundColor3 = Color3.fromRGB(20, 50, 20)
+	savePosBtn.BorderSizePixel = 0
+	savePosBtn.ZIndex = 13
+	corner(savePosBtn, 8)
+	stroke(savePosBtn, T.SUCCESS, 1)
+
+	local goSafeBtn = Instance.new("TextButton", safeCard)
+	goSafeBtn.Size = UDim2.new(0, 100, 0, 26)
+	goSafeBtn.Position = UDim2.new(0, 118, 1, -34)
+	goSafeBtn.Text = "🚩 Về Safe Pos"
+	goSafeBtn.TextSize = 10
+	goSafeBtn.Font = Enum.Font.GothamBold
+	goSafeBtn.TextColor3 = T.TEXT3
+	goSafeBtn.BackgroundColor3 = T.SURFACE2
+	goSafeBtn.BorderSizePixel = 0
+	goSafeBtn.ZIndex = 13
+	corner(goSafeBtn, 8)
+	stroke(goSafeBtn, T.BORDER, 1)
+
+	savePosBtn.MouseButton1Click:Connect(function()
+		local char = Player.Character
+		if not char then return end
+		local root = char:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		savedSafePos = root.CFrame
+		local p = root.Position
+		safePosLbl.Text = string.format("Đã lưu: (%.1f, %.1f, %.1f)", p.X, p.Y, p.Z)
+		tween(goSafeBtn, { BackgroundColor3 = Color3.fromRGB(20, 40, 20), TextColor3 = T.SUCCESS })
+		stroke(goSafeBtn, T.SUCCESS, 1)
+		showToast("Đã lưu Safe Position ✓", "ok")
+	end)
+
+	goSafeBtn.MouseButton1Click:Connect(function()
+		if not savedSafePos then showToast("Chưa lưu vị trí!", "warn"); return end
+		local char = Player.Character
+		if not char then return end
+		local root = char:FindFirstChild("HumanoidRootPart")
+		if root then
+			root.CFrame = savedSafePos
+			showToast("Đã về Safe Position 🚩", "ok")
+		end
+	end)
+
+	-- Sanity Check Toggle (detect nếu character bị move bởi server)
+	makeToggle(antiCheatPage, "Phát Hiện Server Move Character ⚠", false, function(on)
+		if on then
+			local lastPos = nil
+			_G._NovaSanityConn = RunService.Heartbeat:Connect(function()
+				local char = Player.Character
+				if not char then return end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if not root then return end
+				if lastPos then
+					local dist = (root.Position - lastPos).Magnitude
+					-- Nếu nhảy > 50 studs trong 1 frame → server đang move
+					if dist > 50 then
+						showToast("⚠ Server đã move character! +" .. math.floor(dist) .. " studs", "err")
+					end
+				end
+				lastPos = root.Position
+			end)
+			showToast("Sanity Check ON ⚠", "ok")
+		else
+			if _G._NovaSanityConn then
+				_G._NovaSanityConn:Disconnect()
+				_G._NovaSanityConn = nil
+			end
+			showToast("Sanity Check OFF", "warn")
+		end
+	end, 12)
+
+	-- Reset tất cả AC
+	local resetACBtn = Instance.new("TextButton", antiCheatPage)
+	resetACBtn.Size = UDim2.new(1, 0, 0, 40)
+	resetACBtn.BackgroundColor3 = Color3.fromRGB(38, 18, 18)
+	resetACBtn.TextColor3 = T.DANGER
+	resetACBtn.Text = "↺  Tắt tất cả Anti-Cheat"
+	resetACBtn.TextSize = 12
+	resetACBtn.Font = Enum.Font.GothamBold
+	resetACBtn.BorderSizePixel = 0
+	resetACBtn.ZIndex = 12
+	resetACBtn.LayoutOrder = 13
+	corner(resetACBtn, 10)
+	stroke(resetACBtn, T.DANGER, 1)
+
+	resetACBtn.MouseEnter:Connect(function()
+		tween(resetACBtn, { BackgroundColor3 = Color3.fromRGB(70, 25, 25) })
+	end)
+	resetACBtn.MouseLeave:Connect(function()
+		tween(resetACBtn, { BackgroundColor3 = Color3.fromRGB(38, 18, 18) })
+	end)
+	resetACBtn.MouseButton1Click:Connect(function()
+		local conns = {
+			"_NovaAntiSpeedConn", "_NovaAntiFlyConn", "_NovaAntiNCConn",
+			"_NovaRespawnConn", "_NovaSanityConn",
+		}
+		for _, k in ipairs(conns) do
+			if _G[k] then pcall(function() _G[k]:Disconnect() end); _G[k] = nil end
+		end
+		_G._NovaAntiTP       = false
+		_G._NovaAntiKick     = false
+		_G._NovaAntiNCDetect = false
+		_G._NovaBlockedRemotes = {}
+		savedSafePos = nil
+		safePosLbl.Text = "Chưa lưu vị trí"
+		-- Re-enable collision
+		local char = Player.Character
+		if char then
+			for _, p in ipairs(char:GetDescendants()) do
+				if p:IsA("BasePart") then p.CanCollide = true end
+			end
+		end
+		showToast("Đã tắt tất cả Anti-Cheat", "warn")
+		resetACBtn.Text = "✓  Done"
+		task.delay(2, function() resetACBtn.Text = "↺  Tắt tất cả Anti-Cheat" end)
+	end)
 end
 
 -- ══════════════════════════════════════════
