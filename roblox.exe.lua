@@ -5809,28 +5809,39 @@ do
 end
 
 -- ══════════════════════════════════════════
--- ★ PAGE: ANTI-CHEAT BYPASS
+-- ★ PAGE: ANTI-CHEAT BYPASS  [NOVA v2]
+-- Nâng cấp bởi Nova Dev — June 2025
 -- ══════════════════════════════════════════
 local antiCheatPage, _ = makePage("AntiCheat")
 
 do
 	-- ════════════════════════════════════════
-	-- SECTION 1: CÁC NÚT MẶC ĐỊNH
+	-- SECTION 1: CÁC NÚT MẶC ĐỊNH (Nâng cấp)
 	-- ════════════════════════════════════════
 	makeSectionLabel(antiCheatPage, "Bypass Mặc Định", 1)
 
-	-- Anti-Speed Check
+	-- ── Anti-Speed Check (v2: fake velocity + smooth lerp report) ──
 	makeToggle(antiCheatPage, "Anti Speed Check 🏃", false, function(on)
 		_G._NovaAntiSpeed = on
 		if on then
 			_G._NovaAntiSpeedConn = RunService.Heartbeat:Connect(function()
 				local char = Player.Character
 				if not char then return end
-				local hum = char:FindFirstChildOfClass("Humanoid")
-				if hum and hum.WalkSpeed > 16 then
-					-- Giả lập speed hợp lệ về phía server
+				local hum  = char:FindFirstChildOfClass("Humanoid")
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if not (hum and root) then return end
+
+				-- Nâng cấp: clamp velocity gửi về server thay vì chỉ set attribute
+				if hum.WalkSpeed > 16 then
 					pcall(function()
 						hum:SetAttribute("_NovaRealSpeed", hum.WalkSpeed)
+						-- Giả lập velocity hợp lệ (16 stud/s) qua AssemblyLinearVelocity
+						local vel = root.AssemblyLinearVelocity
+						local dir = vel.Unit
+						if vel.Magnitude > 0 then
+							local fakeVel = dir * math.min(vel.Magnitude, 16)
+							root.AssemblyLinearVelocity = fakeVel
+						end
 					end)
 				end
 			end)
@@ -5844,7 +5855,7 @@ do
 		end
 	end, 2)
 
-	-- Anti-Fly Detection
+	-- ── Anti-Fly Detection (v2: giả lập Landed state, animation spoofing) ──
 	makeToggle(antiCheatPage, "Anti Fly Detection ✈", false, function(on)
 		_G._NovaAntiFly = on
 		if on then
@@ -5853,30 +5864,45 @@ do
 				if not char then return end
 				local root = char:FindFirstChild("HumanoidRootPart")
 				local hum  = char:FindFirstChildOfClass("Humanoid")
-				if root and hum then
-					-- Giữ trạng thái Seated để qua một số AC đơn giản
+				if not (root and hum) then return end
+
+				if _G._NovaFlying then
 					pcall(function()
-						if _G._NovaFlying then
-							hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-							hum:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
-						end
+						-- Tắt FallingDown để AC không bắt trạng thái rơi
+						hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+						hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      false)
+						-- Nâng cấp: ép humanoid vào trạng thái Running (giả bộ đang đi bộ)
+						hum:ChangeState(Enum.HumanoidStateType.Running)
 					end)
 				end
 			end)
+
+			-- Nâng cấp: ẩn chiều cao bằng cách lock Y-velocity về 0 khi flying
+			_G._NovaAntiFlyVelConn = RunService.Stepped:Connect(function()
+				if not _G._NovaAntiFly or not _G._NovaFlying then return end
+				local char = Player.Character
+				if not char then return end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if root then
+					pcall(function()
+						local v = root.AssemblyLinearVelocity
+						root.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
+					end)
+				end
+			end)
+
 			showToast("Anti Fly Detection ON 🛡", "ok")
 		else
-			if _G._NovaAntiFlyConn then
-				_G._NovaAntiFlyConn:Disconnect()
-				_G._NovaAntiFlyConn = nil
+			for _, k in ipairs({"_NovaAntiFlyConn", "_NovaAntiFlyVelConn"}) do
+				if _G[k] then _G[k]:Disconnect(); _G[k] = nil end
 			end
-			-- Re-enable states
 			local char = Player.Character
 			if char then
 				local hum = char:FindFirstChildOfClass("Humanoid")
 				if hum then
 					pcall(function()
 						hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-						hum:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+						hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      true)
 					end)
 				end
 			end
@@ -5884,12 +5910,11 @@ do
 		end
 	end, 3)
 
-	-- Anti-Teleport Detection
+	-- ── Anti-Teleport Detection (v2: smooth step + jitter để tránh const lerp detect) ──
 	makeToggle(antiCheatPage, "Anti Teleport Detection 📍", false, function(on)
 		_G._NovaAntiTP = on
 		if on then
-			-- Teleport dần dần thay vì nhảy thẳng
-			_G._NovaTeleportSafe = function(targetCFrame)
+			_G._NovaTeleportSafe = function(targetCFrame, customSteps)
 				local char = Player.Character
 				if not char then return end
 				local root = char:FindFirstChild("HumanoidRootPart")
@@ -5898,44 +5923,51 @@ do
 				local startPos = root.Position
 				local endPos   = targetCFrame.Position
 				local dist     = (endPos - startPos).Magnitude
-				local steps    = math.max(math.floor(dist / 20), 3)
+				local steps    = customSteps or math.max(math.floor(dist / 15), 5)
 
 				task.spawn(function()
 					for i = 1, steps do
 						if not _G._NovaAntiTP then break end
 						local alpha = i / steps
-						root.CFrame = CFrame.new(
-							startPos:Lerp(endPos, alpha)
+						-- Nâng cấp: ease-in-out thay vì linear, + micro-jitter
+						local ease  = alpha < 0.5
+							and (2 * alpha * alpha)
+							or  (1 - (-2 * alpha + 2)^2 / 2)
+						local jitter = Vector3.new(
+							math.random(-2, 2) * 0.01,
+							0,
+							math.random(-2, 2) * 0.01
 						)
+						root.CFrame = CFrame.new(startPos:Lerp(endPos, ease) + jitter)
 						task.wait(0.05)
 					end
 					root.CFrame = targetCFrame
 				end)
 			end
-			showToast("Anti TP Detection ON — dùng _G._NovaTeleportSafe(CFrame)", "ok")
+			showToast("Anti TP ON — dùng _G._NovaTeleportSafe(CFrame [, steps])", "ok")
 		else
 			_G._NovaTeleportSafe = nil
 			showToast("Anti TP Detection OFF", "warn")
 		end
 	end, 4)
 
-	-- Anti-Noclip Detection
+	-- ── Anti-Noclip Detection (v2: chỉ tắt collision khi thực sự cần, auto restore) ──
 	makeToggle(antiCheatPage, "Anti NoClip Detection 👻", false, function(on)
 		_G._NovaAntiNCDetect = on
 		if on then
-			-- Thay vì tắt hoàn toàn collision, chỉ tắt với BasePart không phải terrain
 			_G._NovaAntiNCConn = RunService.Stepped:Connect(function()
 				if not _G._NovaAntiNCDetect then return end
 				local char = Player.Character
 				if not char then return end
+				local hrp = char:FindFirstChild("HumanoidRootPart")
 				for _, p in ipairs(char:GetDescendants()) do
-					if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-						p.CanCollide = false
-						-- HRP vẫn collide để tránh bị detect
+					if p:IsA("BasePart") then
+						-- Nâng cấp: HRP + limbs collide = trông như đang đứng bình thường
+						local isHRP  = p.Name == "HumanoidRootPart"
+						local isLimb = p.Name == "LeftFoot" or p.Name == "RightFoot"
+						p.CanCollide = (isHRP or isLimb)
 					end
 				end
-				local hrp = char:FindFirstChild("HumanoidRootPart")
-				if hrp then hrp.CanCollide = true end
 			end)
 			showToast("Anti NoClip Detection ON 🛡", "ok")
 		else
@@ -5953,47 +5985,56 @@ do
 		end
 	end, 5)
 
-	-- Anti-Kick (block kick remotes)
+	-- ── Anti-Kick (v2: hook bền hơn, log reason nếu có) ──
 	makeToggle(antiCheatPage, "Anti Kick 🔒", false, function(on)
 		_G._NovaAntiKick = on
 		if on then
-			pcall(function()
-				local oldNamecall
-				oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-					if _G._NovaAntiKick then
-						local method = getnamecallmethod()
-						if method == "Kick" and self == Player then
-							showToast("Kick đã bị chặn! 🛡", "ok")
-							return  -- block
+			if not _G._NovaAntiKickHooked then
+				pcall(function()
+					local oldNC
+					oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+						if _G._NovaAntiKick then
+							local method = getnamecallmethod()
+							if method == "Kick" and self == Player then
+								local args   = {...}
+								local reason = tostring(args[1] or "không rõ lý do")
+								showToast("🔒 Kick bị chặn: " .. reason, "ok")
+								return
+							end
 						end
-					end
-					return oldNamecall(self, ...)
+						return oldNC(self, ...)
+					end)
+					_G._NovaAntiKickHooked = true
 				end)
-			end)
+			end
 			showToast("Anti Kick ON 🔒", "ok")
 		else
-			showToast("Anti Kick OFF (cần re-inject để tắt hook)", "warn")
+			showToast("Anti Kick OFF (re-inject để tắt hook)", "warn")
 		end
 	end, 6)
 
-	-- Anti-Respawn Lock
+	-- ── Giữ Vị Trí Khi Respawn (v2: delay tunable + re-equip tools) ──
 	makeToggle(antiCheatPage, "Giữ Vị Trí Khi Respawn 📌", false, function(on)
 		if on then
-			_G._NovaRespawnPos = nil
-			_G._NovaRespawnConn = Player.CharacterAdded:Connect(function(char)
-				if _G._NovaRespawnPos then
-					local saved = _G._NovaRespawnPos
-					task.wait(0.5)
-					local root = char:WaitForChild("HumanoidRootPart", 5)
-					if root then root.CFrame = saved end
-				end
-			end)
-			-- Lưu vị trí hiện tại
+			_G._NovaRespawnPos  = nil
+			_G._NovaRespawnDelay = _G._NovaRespawnDelay or 0.6   -- giây chờ sau respawn
+
+			-- Lưu vị trí và backpack hiện tại
 			local char = Player.Character
 			if char then
 				local root = char:FindFirstChild("HumanoidRootPart")
 				if root then _G._NovaRespawnPos = root.CFrame end
 			end
+
+			_G._NovaRespawnConn = Player.CharacterAdded:Connect(function(char)
+				if not _G._NovaRespawnPos then return end
+				local saved = _G._NovaRespawnPos
+				task.wait(_G._NovaRespawnDelay)
+				local root = char:WaitForChild("HumanoidRootPart", 6)
+				if root then
+					root.CFrame = saved
+				end
+			end)
 			showToast("Giữ vị trí respawn ON 📌", "ok")
 		else
 			if _G._NovaRespawnConn then
@@ -6005,14 +6046,13 @@ do
 		end
 	end, 7)
 
-	-- ════════════════════════════════════════
-	-- SECTION 2: TÙY CHỈNH (Custom)
-	-- ════════════════════════════════════════
-	makeSectionLabel(antiCheatPage, "Tùy Chỉnh", 8)
+	-- ═══════════════════════════════════════════════════════════════
+	-- SECTION 2: TÙY CHỈNH — MỞ RỘNG & THÊM TÍNH NĂNG MỚI
+	-- ═══════════════════════════════════════════════════════════════
+	makeSectionLabel(antiCheatPage, "Tùy Chỉnh & Nâng Cao", 8)
 
-	-- Info banner
 	local customBanner = newFrame(antiCheatPage, {
-		BG = Color3.fromRGB(16, 20, 40),
+		BG   = Color3.fromRGB(16, 20, 40),
 		Size = UDim2.new(1, 0, 0, 32),
 		ZIndex = 12,
 	})
@@ -6020,58 +6060,60 @@ do
 	corner(customBanner, 10)
 	stroke(customBanner, T.ACCENT, 1)
 	newLabel(customBanner, {
-		Text = "  ℹ Các tùy chọn dưới đây cần chỉnh tay theo từng game",
-		Color = T.ACCENT, Size = 10,
-		Sz = UDim2.new(1, -10, 1, 0),
+		Text     = "  ℹ Các tùy chọn dưới đây cần chỉnh tay theo từng game",
+		Color    = T.ACCENT, Size = 10,
+		Sz       = UDim2.new(1, -10, 1, 0),
 		Position = UDim2.new(0, 10, 0, 0),
-		ZIndex = 13,
+		ZIndex   = 13,
 	})
 
-	-- Custom RemoteEvent Blocker
+	-- ════════════════════════════
+	-- 2A: Remote Event Blocker
+	-- ════════════════════════════
 	local blockCard = makeCard(antiCheatPage, 80, 10)
 	gradient(blockCard, Color3.fromRGB(16, 16, 32), Color3.fromRGB(10, 10, 20), 135)
 
 	newLabel(blockCard, {
-		Text = "🚫 Chặn RemoteEvent theo tên",
+		Text  = "🚫 Chặn RemoteEvent theo tên",
 		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
-		Sz = UDim2.new(1, -20, 0, 20),
+		Sz       = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
 	})
 	newLabel(blockCard, {
-		Text = "Nhập tên remote cần chặn (AC report, ban event…)",
-		Color = T.TEXT3, Size = 9,
-		Sz = UDim2.new(1, -20, 0, 16),
+		Text     = "Nhập tên remote cần chặn (AC report, ban event…)",
+		Color    = T.TEXT3, Size = 9,
+		Sz       = UDim2.new(1, -20, 0, 16),
 		Position = UDim2.new(0, 12, 0, 24), ZIndex = 13,
 	})
 
 	local blockBox = Instance.new("TextBox", blockCard)
-	blockBox.Size = UDim2.new(1, -72, 0, 24)
-	blockBox.Position = UDim2.new(0, 10, 1, -32)
+	blockBox.Size            = UDim2.new(1, -72, 0, 24)
+	blockBox.Position        = UDim2.new(0, 10, 1, -32)
 	blockBox.BackgroundColor3 = T.SURFACE2
 	blockBox.BorderSizePixel = 0
-	blockBox.TextColor3 = T.TEXT
+	blockBox.TextColor3      = T.TEXT
 	blockBox.PlaceholderText = "e.g. ReportPlayer, BanEvent"
 	blockBox.PlaceholderColor3 = T.TEXT3
-	blockBox.Text = ""
-	blockBox.TextSize = 11
-	blockBox.Font = Enum.Font.Gotham
+	blockBox.Text            = ""
+	blockBox.TextSize        = 11
+	blockBox.Font            = Enum.Font.Gotham
 	blockBox.ClearTextOnFocus = false
-	blockBox.ZIndex = 13
+	blockBox.ZIndex          = 13
 	corner(blockBox, 7)
 	stroke(blockBox, T.BORDER, 1)
 	local bbPad = Instance.new("UIPadding", blockBox)
 	bbPad.PaddingLeft = UDim.new(0, 8)
 
 	local blockAddBtn = Instance.new("TextButton", blockCard)
-	blockAddBtn.Size = UDim2.new(0, 52, 0, 24)
-	blockAddBtn.Position = UDim2.new(1, -60, 1, -32)
-	blockAddBtn.Text = "+ Block"
-	blockAddBtn.TextSize = 10
-	blockAddBtn.Font = Enum.Font.GothamBold
-	blockAddBtn.TextColor3 = T.WHITE
+	blockAddBtn.Size             = UDim2.new(0, 52, 0, 24)
+	blockAddBtn.Position         = UDim2.new(1, -60, 1, -32)
+	blockAddBtn.Text             = "+ Block"
+	blockAddBtn.TextSize         = 10
+	blockAddBtn.Font             = Enum.Font.GothamBold
+	blockAddBtn.TextColor3       = T.WHITE
 	blockAddBtn.BackgroundColor3 = T.DANGER
-	blockAddBtn.BorderSizePixel = 0
-	blockAddBtn.ZIndex = 13
+	blockAddBtn.BorderSizePixel  = 0
+	blockAddBtn.ZIndex           = 13
 	corner(blockAddBtn, 7)
 
 	_G._NovaBlockedRemotes = _G._NovaBlockedRemotes or {}
@@ -6080,10 +6122,9 @@ do
 		local name = blockBox.Text:match("^%s*(.-)%s*$")
 		if name == "" then showToast("Nhập tên remote!", "warn"); return end
 		_G._NovaBlockedRemotes[name] = true
-		showToast("Đã chặn remote: " .. name, "ok")
+		showToast("Đã chặn: " .. name, "ok")
 		blockBox.Text = ""
 
-		-- Hook nếu chưa
 		pcall(function()
 			if not _G._NovaRemoteBlockHooked then
 				_G._NovaRemoteBlockHooked = true
@@ -6092,8 +6133,8 @@ do
 					if _G._NovaBlockedRemotes[self.Name] then
 						local method = getnamecallmethod()
 						if method == "FireServer" or method == "InvokeServer" then
-							showToast("Blocked: " .. self.Name, "warn")
-							return  -- chặn fire
+							showToast("🚫 Blocked remote: " .. self.Name, "warn")
+							return
 						end
 					end
 					return oldNC(self, ...)
@@ -6102,52 +6143,52 @@ do
 		end)
 	end)
 
-	-- Whitelist / Safe Position
+	-- ════════════════════════════
+	-- 2B: Safe Position
+	-- ════════════════════════════
 	local safeCard = makeCard(antiCheatPage, 80, 11)
 	gradient(safeCard, Color3.fromRGB(14, 22, 14), Color3.fromRGB(10, 14, 10), 135)
 	stroke(safeCard, T.SUCCESS, 1)
 
 	newLabel(safeCard, {
-		Text = "📌 Safe Position (lưu & teleport về)",
-		Color = T.SUCCESS, Size = 12, Font = Enum.Font.GothamBold,
-		Sz = UDim2.new(1, -20, 0, 20),
+		Text     = "📌 Safe Position",
+		Color    = T.SUCCESS, Size = 12, Font = Enum.Font.GothamBold,
+		Sz       = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
 	})
 
 	local safePosLbl = newLabel(safeCard, {
-		Text = "Chưa lưu vị trí",
-		Color = T.TEXT3, Size = 9,
-		Sz = UDim2.new(1, -20, 0, 16),
+		Text     = "Chưa lưu vị trí",
+		Color    = T.TEXT3, Size = 9,
+		Sz       = UDim2.new(1, -20, 0, 16),
 		Position = UDim2.new(0, 12, 0, 26), ZIndex = 13,
 	})
 
 	local savedSafePos = nil
 
 	local savePosBtn = Instance.new("TextButton", safeCard)
-	savePosBtn.Size = UDim2.new(0, 100, 0, 26)
-	savePosBtn.Position = UDim2.new(0, 10, 1, -34)
-	savePosBtn.Text = "💾 Lưu vị trí"
-	savePosBtn.TextSize = 10
-	savePosBtn.Font = Enum.Font.GothamBold
-	savePosBtn.TextColor3 = T.WHITE
+	savePosBtn.Size             = UDim2.new(0, 100, 0, 26)
+	savePosBtn.Position         = UDim2.new(0, 10, 1, -34)
+	savePosBtn.Text             = "💾 Lưu vị trí"
+	savePosBtn.TextSize         = 10
+	savePosBtn.Font             = Enum.Font.GothamBold
+	savePosBtn.TextColor3       = T.WHITE
 	savePosBtn.BackgroundColor3 = Color3.fromRGB(20, 50, 20)
-	savePosBtn.BorderSizePixel = 0
-	savePosBtn.ZIndex = 13
-	corner(savePosBtn, 8)
-	stroke(savePosBtn, T.SUCCESS, 1)
+	savePosBtn.BorderSizePixel  = 0
+	savePosBtn.ZIndex           = 13
+	corner(savePosBtn, 8); stroke(savePosBtn, T.SUCCESS, 1)
 
 	local goSafeBtn = Instance.new("TextButton", safeCard)
-	goSafeBtn.Size = UDim2.new(0, 100, 0, 26)
-	goSafeBtn.Position = UDim2.new(0, 118, 1, -34)
-	goSafeBtn.Text = "🚩 Về Safe Pos"
-	goSafeBtn.TextSize = 10
-	goSafeBtn.Font = Enum.Font.GothamBold
-	goSafeBtn.TextColor3 = T.TEXT3
+	goSafeBtn.Size             = UDim2.new(0, 100, 0, 26)
+	goSafeBtn.Position         = UDim2.new(0, 118, 1, -34)
+	goSafeBtn.Text             = "🚩 Về Safe Pos"
+	goSafeBtn.TextSize         = 10
+	goSafeBtn.Font             = Enum.Font.GothamBold
+	goSafeBtn.TextColor3       = T.TEXT3
 	goSafeBtn.BackgroundColor3 = T.SURFACE2
-	goSafeBtn.BorderSizePixel = 0
-	goSafeBtn.ZIndex = 13
-	corner(goSafeBtn, 8)
-	stroke(goSafeBtn, T.BORDER, 1)
+	goSafeBtn.BorderSizePixel  = 0
+	goSafeBtn.ZIndex           = 13
+	corner(goSafeBtn, 8); stroke(goSafeBtn, T.BORDER, 1)
 
 	savePosBtn.MouseButton1Click:Connect(function()
 		local char = Player.Character
@@ -6156,7 +6197,7 @@ do
 		if not root then return end
 		savedSafePos = root.CFrame
 		local p = root.Position
-		safePosLbl.Text = string.format("Đã lưu: (%.1f, %.1f, %.1f)", p.X, p.Y, p.Z)
+		safePosLbl.Text = string.format("✓ (%.1f, %.1f, %.1f)", p.X, p.Y, p.Z)
 		tween(goSafeBtn, { BackgroundColor3 = Color3.fromRGB(20, 40, 20), TextColor3 = T.SUCCESS })
 		stroke(goSafeBtn, T.SUCCESS, 1)
 		showToast("Đã lưu Safe Position ✓", "ok")
@@ -6167,14 +6208,13 @@ do
 		local char = Player.Character
 		if not char then return end
 		local root = char:FindFirstChild("HumanoidRootPart")
-		if root then
-			root.CFrame = savedSafePos
-			showToast("Đã về Safe Position 🚩", "ok")
-		end
+		if root then root.CFrame = savedSafePos; showToast("Về Safe Position 🚩", "ok") end
 	end)
 
-	-- Sanity Check Toggle (detect nếu character bị move bởi server)
-	makeToggle(antiCheatPage, "Phát Hiện Server Move Character ⚠", false, function(on)
+	-- ════════════════════════════
+	-- 2C: Sanity Check (server move detector)
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Phát Hiện Server Move ⚠", false, function(on)
 		if on then
 			local lastPos = nil
 			_G._NovaSanityConn = RunService.Heartbeat:Connect(function()
@@ -6184,9 +6224,8 @@ do
 				if not root then return end
 				if lastPos then
 					local dist = (root.Position - lastPos).Magnitude
-					-- Nếu nhảy > 50 studs trong 1 frame → server đang move
 					if dist > 50 then
-						showToast("⚠ Server đã move character! +" .. math.floor(dist) .. " studs", "err")
+						showToast("⚠ Server move: +" .. math.floor(dist) .. " studs", "err")
 					end
 				end
 				lastPos = root.Position
@@ -6201,19 +6240,254 @@ do
 		end
 	end, 12)
 
-	-- Reset tất cả AC
+	-- ════════════════════════════
+	-- 2D: MỚI — Anti-Damage / God Mode Client-side
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Anti Damage (Client) 💉", false, function(on)
+		_G._NovaAntiDmg = on
+		if on then
+			_G._NovaAntiDmgConn = RunService.Heartbeat:Connect(function()
+				local char = Player.Character
+				if not char then return end
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum and hum.Health < hum.MaxHealth then
+					pcall(function() hum.Health = hum.MaxHealth end)
+				end
+			end)
+			showToast("Anti Damage ON 💉 (client-side)", "ok")
+		else
+			if _G._NovaAntiDmgConn then
+				_G._NovaAntiDmgConn:Disconnect()
+				_G._NovaAntiDmgConn = nil
+			end
+			showToast("Anti Damage OFF", "warn")
+		end
+	end, 13)
+
+	-- ════════════════════════════
+	-- 2E: MỚI — Remote Event Logger (spy)
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Remote Event Spy 🔍", false, function(on)
+		_G._NovaRemoteSpy = on
+		if on then
+			if not _G._NovaRemoteSpyHooked then
+				pcall(function()
+					local oldNC
+					oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+						if _G._NovaRemoteSpy then
+							local method = getnamecallmethod()
+							if method == "FireServer" or method == "InvokeServer" then
+								local args = {...}
+								local info = self.Name .. " | " .. method
+								-- In tối đa 2 arg đầu ra toast ngắn gọn
+								if args[1] ~= nil then
+									info = info .. " | arg1=" .. tostring(args[1])
+								end
+								print("[NovaSpy] " .. info)
+								showToast("🔍 " .. self.Name .. " → " .. method, "ok")
+							end
+						end
+						return oldNC(self, ...)
+					end)
+					_G._NovaRemoteSpyHooked = true
+				end)
+			end
+			showToast("Remote Spy ON — xem Output để log chi tiết", "ok")
+		else
+			showToast("Remote Spy OFF (hook vẫn chạy, chỉ tắt log)", "warn")
+		end
+	end, 14)
+
+	-- ════════════════════════════
+	-- 2F: MỚI — Anti-Reset / Anti-Suicide
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Anti Reset / Anti Suicide ☠", false, function(on)
+		_G._NovaAntiReset = on
+		if on then
+			if not _G._NovaAntiResetHooked then
+				pcall(function()
+					local oldNC
+					oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+						if _G._NovaAntiReset then
+							local method = getnamecallmethod()
+							-- Chặn :TakeDamage(999) / hum.Health = 0 qua namecall
+							if method == "TakeDamage" and self:IsA("Humanoid") then
+								local dmg = select(1, ...)
+								if dmg and dmg >= self.Health then
+									showToast("☠ Anti-Reset: blocked TakeDamage(" .. dmg .. ")", "ok")
+									return
+								end
+							end
+						end
+						return oldNC(self, ...)
+					end)
+					_G._NovaAntiResetHooked = true
+				end)
+			end
+			showToast("Anti Reset ON ☠", "ok")
+		else
+			showToast("Anti Reset OFF (re-inject để tắt hook)", "warn")
+		end
+	end, 15)
+
+	-- ════════════════════════════
+	-- 2G: MỚI — Fake Ping (giả mạo network latency thấp)
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Fake Low Ping 📶", false, function(on)
+		_G._NovaFakePing = on
+		if on then
+			-- Một số AC check Stats.PingInstance — override hiển thị
+			pcall(function()
+				local stats = game:GetService("Stats")
+				if stats then
+					local pingInst = stats:FindFirstChild("PingInstance")
+						or stats:FindFirstChild("Ping")
+					if pingInst and pingInst:IsA("NumberValue") then
+						_G._NovaFakePingConn = RunService.Heartbeat:Connect(function()
+							if _G._NovaFakePing then
+								pcall(function() pingInst.Value = math.random(18, 32) end)
+							end
+						end)
+					else
+						showToast("Không tìm thấy PingInstance trong game này", "warn")
+						return
+					end
+				end
+			end)
+			showToast("Fake Ping ON 📶 (~18–32ms)", "ok")
+		else
+			if _G._NovaFakePingConn then
+				_G._NovaFakePingConn:Disconnect()
+				_G._NovaFakePingConn = nil
+			end
+			showToast("Fake Ping OFF", "warn")
+		end
+	end, 16)
+
+	-- ════════════════════════════
+	-- 2H: MỚI — Anti-Spectate Detection
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Anti Spectate Detection 👁", false, function(on)
+		_G._NovaAntiSpec = on
+		if on then
+			-- Khi có người đang spectate, camera sẽ chuyển về character họ.
+			-- Ta intercept CurrentCamera.CameraSubject và giữ nó trỏ đúng.
+			_G._NovaAntiSpecConn = RunService.RenderStepped:Connect(function()
+				if not _G._NovaAntiSpec then return end
+				local cam = workspace.CurrentCamera
+				if cam and cam.CameraSubject ~= Player.Character then
+					local char = Player.Character
+					if char then
+						local hum = char:FindFirstChildOfClass("Humanoid")
+						if hum then cam.CameraSubject = hum end
+					end
+				end
+			end)
+			showToast("Anti Spectate ON 👁", "ok")
+		else
+			if _G._NovaAntiSpecConn then
+				_G._NovaAntiSpecConn:Disconnect()
+				_G._NovaAntiSpecConn = nil
+			end
+			showToast("Anti Spectate OFF", "warn")
+		end
+	end, 17)
+
+	-- ════════════════════════════
+	-- 2I: MỚI — Network Ownership Claimer
+	-- ════════════════════════════
+	makeToggle(antiCheatPage, "Claim Network Ownership 🌐", false, function(on)
+		_G._NovaNetOwner = on
+		if on then
+			_G._NovaNetOwnerConn = RunService.Heartbeat:Connect(function()
+				if not _G._NovaNetOwner then return end
+				local char = Player.Character
+				if not char then return end
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") then
+						pcall(function()
+							p:SetNetworkOwner(Player)
+						end)
+					end
+				end
+			end)
+			showToast("Network Ownership ON 🌐", "ok")
+		else
+			if _G._NovaNetOwnerConn then
+				_G._NovaNetOwnerConn:Disconnect()
+				_G._NovaNetOwnerConn = nil
+			end
+			showToast("Network Ownership OFF", "warn")
+		end
+	end, 18)
+
+	-- ════════════════════════════
+	-- 2J: MỚI — Respawn Delay Slider
+	-- ════════════════════════════
+	local delayCard = makeCard(antiCheatPage, 60, 19)
+	gradient(delayCard, Color3.fromRGB(18, 18, 30), Color3.fromRGB(12, 12, 22), 135)
+
+	newLabel(delayCard, {
+		Text     = "⏱ Tùy chỉnh độ trễ Respawn (giây)",
+		Color    = T.TEXT, Size = 11, Font = Enum.Font.GothamBold,
+		Sz       = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+
+	_G._NovaRespawnDelay = _G._NovaRespawnDelay or 0.6
+
+	local delayValLbl = newLabel(delayCard, {
+		Text     = "Hiện tại: " .. _G._NovaRespawnDelay .. "s",
+		Color    = T.ACCENT, Size = 10,
+		Sz       = UDim2.new(0, 80, 0, 16),
+		Position = UDim2.new(1, -90, 0, 8), ZIndex = 13,
+	})
+
+	local delaySlider = Instance.new("TextBox", delayCard)
+	delaySlider.Size             = UDim2.new(1, -24, 0, 24)
+	delaySlider.Position         = UDim2.new(0, 12, 1, -32)
+	delaySlider.BackgroundColor3 = T.SURFACE2
+	delaySlider.BorderSizePixel  = 0
+	delaySlider.TextColor3       = T.TEXT
+	delaySlider.PlaceholderText  = "Nhập số giây (0.1 – 5.0)"
+	delaySlider.PlaceholderColor3 = T.TEXT3
+	delaySlider.Text             = tostring(_G._NovaRespawnDelay)
+	delaySlider.TextSize         = 11
+	delaySlider.Font             = Enum.Font.Gotham
+	delaySlider.ClearTextOnFocus = false
+	delaySlider.ZIndex           = 13
+	corner(delaySlider, 7); stroke(delaySlider, T.BORDER, 1)
+	local dsPad = Instance.new("UIPadding", delaySlider)
+	dsPad.PaddingLeft = UDim.new(0, 8)
+
+	delaySlider.FocusLost:Connect(function()
+		local val = tonumber(delaySlider.Text)
+		if val then
+			val = math.clamp(val, 0.1, 5.0)
+			_G._NovaRespawnDelay = val
+			delayValLbl.Text    = "Hiện tại: " .. val .. "s"
+			delaySlider.Text    = tostring(val)
+			showToast("Respawn delay: " .. val .. "s", "ok")
+		else
+			showToast("Nhập số hợp lệ (0.1–5.0)", "warn")
+			delaySlider.Text = tostring(_G._NovaRespawnDelay)
+		end
+	end)
+
+	-- ════════════════════════════
+	-- RESET ALL BUTTON
+	-- ════════════════════════════
 	local resetACBtn = Instance.new("TextButton", antiCheatPage)
-	resetACBtn.Size = UDim2.new(1, 0, 0, 40)
+	resetACBtn.Size             = UDim2.new(1, 0, 0, 40)
 	resetACBtn.BackgroundColor3 = Color3.fromRGB(38, 18, 18)
-	resetACBtn.TextColor3 = T.DANGER
-	resetACBtn.Text = "↺  Tắt tất cả Anti-Cheat"
-	resetACBtn.TextSize = 12
-	resetACBtn.Font = Enum.Font.GothamBold
-	resetACBtn.BorderSizePixel = 0
-	resetACBtn.ZIndex = 12
-	resetACBtn.LayoutOrder = 13
-	corner(resetACBtn, 10)
-	stroke(resetACBtn, T.DANGER, 1)
+	resetACBtn.TextColor3       = T.DANGER
+	resetACBtn.Text             = "↺  Tắt tất cả Anti-Cheat"
+	resetACBtn.TextSize         = 12
+	resetACBtn.Font             = Enum.Font.GothamBold
+	resetACBtn.BorderSizePixel  = 0
+	resetACBtn.ZIndex           = 12
+	resetACBtn.LayoutOrder      = 20
+	corner(resetACBtn, 10); stroke(resetACBtn, T.DANGER, 1)
 
 	resetACBtn.MouseEnter:Connect(function()
 		tween(resetACBtn, { BackgroundColor3 = Color3.fromRGB(70, 25, 25) })
@@ -6221,28 +6495,51 @@ do
 	resetACBtn.MouseLeave:Connect(function()
 		tween(resetACBtn, { BackgroundColor3 = Color3.fromRGB(38, 18, 18) })
 	end)
+
 	resetACBtn.MouseButton1Click:Connect(function()
 		local conns = {
-			"_NovaAntiSpeedConn", "_NovaAntiFlyConn", "_NovaAntiNCConn",
-			"_NovaRespawnConn", "_NovaSanityConn",
+			"_NovaAntiSpeedConn",
+			"_NovaAntiFlyConn", "_NovaAntiFlyVelConn",
+			"_NovaAntiNCConn",
+			"_NovaRespawnConn",
+			"_NovaSanityConn",
+			"_NovaAntiDmgConn",
+			"_NovaFakePingConn",
+			"_NovaAntiSpecConn",
+			"_NovaNetOwnerConn",
 		}
 		for _, k in ipairs(conns) do
 			if _G[k] then pcall(function() _G[k]:Disconnect() end); _G[k] = nil end
 		end
-		_G._NovaAntiTP       = false
-		_G._NovaAntiKick     = false
-		_G._NovaAntiNCDetect = false
+
+		-- Reset flags
+		local flags = {
+			"_NovaAntiTP", "_NovaAntiKick", "_NovaAntiNCDetect",
+			"_NovaRemoteSpy", "_NovaAntiReset", "_NovaFakePing",
+			"_NovaAntiSpec", "_NovaNetOwner", "_NovaAntiDmg",
+		}
+		for _, f in ipairs(flags) do _G[f] = false end
+
 		_G._NovaBlockedRemotes = {}
-		savedSafePos = nil
-		safePosLbl.Text = "Chưa lưu vị trí"
-		-- Re-enable collision
+		savedSafePos           = nil
+		safePosLbl.Text        = "Chưa lưu vị trí"
+
+		-- Restore collision
 		local char = Player.Character
 		if char then
 			for _, p in ipairs(char:GetDescendants()) do
 				if p:IsA("BasePart") then p.CanCollide = true end
 			end
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum then
+				pcall(function()
+					hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+					hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      true)
+				end)
+			end
 		end
-		showToast("Đã tắt tất cả Anti-Cheat", "warn")
+
+		showToast("✓ Đã tắt toàn bộ Anti-Cheat", "warn")
 		resetACBtn.Text = "✓  Done"
 		task.delay(2, function() resetACBtn.Text = "↺  Tắt tất cả Anti-Cheat" end)
 	end)
@@ -6855,13 +7152,16 @@ do
 	end
 end
 
--- ══════════════════════════════════════════
--- ★ PAGE: EXPLORER  (Instance tree browser)
--- ══════════════════════════════════════════
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║         NOVA UI  v2.3  —  EXPLORER UPGRADE                 ║
+-- ║   Thay thế toàn bộ PAGE: EXPLORER  trong script gốc        ║
+-- ╚══════════════════════════════════════════════════════════════╝
+
+-- Lưu ý: Copy các tham số như T, EZ, showToast, newFrame, newLabel, v.v. từ script gốc
+
 local explorerPage, _ = makePage("Explorer")
 
 do
-	-- ── Icon map theo ClassName ──
 	local CLASS_ICON = {
 		Workspace            = "🌍",
 		ReplicatedStorage    = "📦",
@@ -6882,14 +7182,6 @@ do
 		Part                 = "🔷",
 		MeshPart             = "🔷",
 		UnionOperation       = "🔷",
-		BasePart             = "🔷",
-		Folder               = "📁",
-		Configuration        = "⚙",
-		StringValue          = "T",
-		IntValue             = "#",
-		NumberValue          = "#",
-		BoolValue            = "?",
-		ObjectValue          = "○",
 		Humanoid             = "🚶",
 		HumanoidRootPart     = "⊕",
 		Camera               = "📷",
@@ -6912,52 +7204,43 @@ do
 		Accessory            = "👒",
 		Tool                 = "🔧",
 		SpawnLocation        = "🚩",
-		SurfaceGui           = "📋",
-		SelectionBox         = "🔲",
+		Folder               = "📁",
+		Configuration        = "⚙",
 	}
 
 	local function getIcon(inst)
 		return CLASS_ICON[inst.ClassName] or "◦"
 	end
 
-	-- ── Root services để duyệt ──
+	-- Root services
 	local ROOT_SERVICES = {
-		"Workspace",
-		"ReplicatedStorage",
-		"ReplicatedFirst",
-		"Players",
-		"Lighting",
-		"StarterGui",
-		"StarterPack",
+		"Workspace", "ReplicatedStorage", "ReplicatedFirst", "Players",
+		"Lighting", "StarterGui", "StarterPack",
 	}
 
-	-- ── State ──
-	local expanded   = {}   -- [instance] = true/false
-	local selectedInst = nil
+	-- State
+	local expanded     = {}     -- [instance] = true/false
+	local selectedInst = nil    -- instance đang chọn
+	local selectedPath = ""     -- path string
 	local searchQuery  = ""
-	local nodeRows   = {}   -- list of rendered row frames
+	local filterClass = ""      -- filter theo class type
+	local nodeRows    = {}
+	local propEditor  = nil     -- properties panel reference
 
-	-- ── Container bên trong explorerPage ──
+	-- ════════════════════════════════════════
+	-- [1] TOOLBAR  (Search + Filters + Buttons)
+	-- ════════════════════════════════════════
+	local toolCard = makeCard(explorerPage, 48, 1)
+	gradient(toolCard, Color3.fromRGB(20,20,38), Color3.fromRGB(15,15,26), 135)
 
-	-- Search bar card
-	local searchCard = makeCard(explorerPage, 42, 1)
-	gradient(searchCard, Color3.fromRGB(20,20,38), Color3.fromRGB(15,15,26), 135)
-
-	local searchIcon = newLabel(searchCard, {
-		Text = "🔍", Size = 13,
-		Sz = UDim2.new(0,28,1,0),
-		Position = UDim2.new(0,8,0,0),
-		AlignX = Enum.TextXAlignment.Center,
-		ZIndex = 13,
-	})
-
-	local searchBox = Instance.new("TextBox", searchCard)
-	searchBox.Size = UDim2.new(1,-80,0,26)
-	searchBox.Position = UDim2.new(0,34,0.5,-13)
+	-- Search box
+	local searchBox = Instance.new("TextBox", toolCard)
+	searchBox.Size = UDim2.new(1,-100,0,28)
+	searchBox.Position = UDim2.new(0,8,0.5,-14)
 	searchBox.BackgroundColor3 = T.SURFACE2
 	searchBox.BorderSizePixel = 0
 	searchBox.TextColor3 = T.TEXT
-	searchBox.PlaceholderText = "Tìm kiếm instance…"
+	searchBox.PlaceholderText = "🔍 Tìm instance…"
 	searchBox.PlaceholderColor3 = T.TEXT3
 	searchBox.Text = ""
 	searchBox.TextSize = 11
@@ -6969,42 +7252,134 @@ do
 	local sbPad = Instance.new("UIPadding", searchBox)
 	sbPad.PaddingLeft = UDim.new(0,8)
 
-	-- Refresh button
-	local refreshBtn = Instance.new("TextButton", searchCard)
-	refreshBtn.Size = UDim2.new(0,34,0,26)
-	refreshBtn.Position = UDim2.new(1,-40,0.5,-13)
-	refreshBtn.Text = "↺"
-	refreshBtn.TextSize = 16
-	refreshBtn.Font = Enum.Font.GothamBold
-	refreshBtn.TextColor3 = T.ACCENT
-	refreshBtn.BackgroundColor3 = T.SURFACE2
-	refreshBtn.BorderSizePixel = 0
-	refreshBtn.ZIndex = 13
-	corner(refreshBtn, 7)
-	stroke(refreshBtn, T.BORDER, 1)
-	refreshBtn.MouseEnter:Connect(function() tween(refreshBtn,{BackgroundColor3=T.GLASS}) end)
-	refreshBtn.MouseLeave:Connect(function() tween(refreshBtn,{BackgroundColor3=T.SURFACE2}) end)
+	-- Action buttons
+	local function makeToolBtn(label, x, w, color, onClick)
+		local b = Instance.new("TextButton", toolCard)
+		b.Size = UDim2.new(0,w,0,26)
+		b.Position = UDim2.new(0,x,0.5,-13)
+		b.Text = label
+		b.TextSize = 9
+		b.Font = Enum.Font.GothamBold
+		b.TextColor3 = color
+		b.BackgroundColor3 = T.SURFACE2
+		b.BorderSizePixel = 0
+		b.ZIndex = 13
+		corner(b,7)
+		stroke(b, color, 1)
+		b.MouseButton1Click:Connect(onClick)
+		b.MouseEnter:Connect(function() tween(b,{BackgroundColor3=T.GLASS}) end)
+		b.MouseLeave:Connect(function() tween(b,{BackgroundColor3=T.SURFACE2}) end)
+		return b
+	end
 
-	-- Stats row (count)
-	local statsRow = newFrame(explorerPage, {
+	local copyPathBtn = makeToolBtn("📋 Copy Path", 1,-52, T.ACCENT, function()
+		if selectedInst then
+			copyText(selectedPath)
+			showToast("Path copied: "..selectedPath:sub(1,50), "ok")
+		else
+			showToast("Select instance first", "warn")
+		end
+	end)
+
+	local refreshBtn = makeToolBtn("↺", 1,-40, T.TEXT3, function()
+		searchQuery = ""
+		searchBox.Text = ""
+		filterClass = ""
+		selectedInst = nil
+		selectedPath = ""
+		expanded = {}
+		for _, svc in ipairs(ROOT_SERVICES) do
+			local ok, s = pcall(function() return game:GetService(svc) end)
+			if ok and s then expanded[s] = (svc=="Workspace" or svc=="ReplicatedStorage") end
+		end
+		rebuildTree()
+		showToast("Explorer refreshed", "ok")
+	end)
+
+	-- ════════════════════════════════════════
+	-- [2] FILTER BAR  (Class type quick filters)
+	-- ════════════════════════════════════════
+	local filterRow = newFrame(explorerPage, {
 		BG=Color3.fromRGB(0,0,0), BT=1,
-		Size=UDim2.new(1,0,0,18), ZIndex=12,
+		Size=UDim2.new(1,0,0,24), ZIndex=12,
 	})
-	statsRow.LayoutOrder = 2
-	local countLbl = newLabel(statsRow, {
-		Text="", Color=T.TEXT3, Size=9,
-		Font=Enum.Font.GothamBold,
-		Sz=UDim2.new(1,0,1,0), ZIndex=12,
-	})
-	local cPad = Instance.new("UIPadding",countLbl); cPad.PaddingLeft=UDim.new(0,4)
+	filterRow.LayoutOrder = 2
+	local filterLL = Instance.new("UIListLayout", filterRow)
+	filterLL.FillDirection = Enum.FillDirection.Horizontal
+	filterLL.SortOrder = Enum.SortOrder.LayoutOrder
+	filterLL.Padding = UDim.new(0,3)
+	local filterPad = Instance.new("UIPadding", filterRow)
+	filterPad.PaddingLeft = UDim.new(0,8); filterPad.PaddingRight = UDim.new(0,8)
+	filterPad.PaddingTop = UDim.new(0,2); filterPad.PaddingBottom = UDim.new(0,2)
 
-	-- Tree container (treeFrame thay thế scrolling list bình thường)
+	local FILTER_DEFS = {
+		{label="All",     class="",             order=1},
+		{label="Scripts", class="LocalScript",  order=2},
+		{label="Parts",   class="BasePart",     order=3},
+		{label="GUIs",    class="GuiObject",    order=4},
+		{label="Remotes", class="RemoteEvent", order=5},
+	}
+	local filterBtns = {}
+
+	local function applyFilter(filterClass_)
+		filterClass = filterClass_
+		rebuildTree()
+		for _, fb in ipairs(filterBtns) do
+			local isActive = (filterClass == fb.class)
+			tween(fb.btn, {
+				BackgroundColor3 = isActive and T.ACCENT or T.SURFACE2,
+				TextColor3 = isActive and T.WHITE or T.TEXT3,
+			})
+		end
+	end
+
+	for _, fd in ipairs(FILTER_DEFS) do
+		local fb = Instance.new("TextButton", filterRow)
+		fb.Size = UDim2.new(0,0,0,18)
+		fb.AutomaticSize = Enum.AutomaticSize.X
+		fb.Text = fd.label
+		fb.TextSize = 9
+		fb.Font = Enum.Font.GothamBold
+		fb.TextColor3 = fd.order==1 and T.WHITE or T.TEXT3
+		fb.BackgroundColor3 = fd.order==1 and T.ACCENT or T.SURFACE2
+		fb.BorderSizePixel = 0
+		fb.ZIndex = 13
+		fb.LayoutOrder = fd.order
+		corner(fb, 6)
+		stroke(fb, fd.order==1 and T.ACCENT or T.BORDER, 1)
+
+		fb.MouseButton1Click:Connect(function() applyFilter(fd.class) end)
+		fb.MouseEnter:Connect(function() tween(fb,{BackgroundColor3=T.GLASS}) end)
+		fb.MouseLeave:Connect(function() tween(fb,{BackgroundColor3=filterClass==fd.class and T.ACCENT or T.SURFACE2}) end)
+
+		table.insert(filterBtns, {btn=fb, class=fd.class})
+	end
+
+	-- ════════════════════════════════════════
+	-- [3] STATS / INFO ROW
+	-- ════════════════════════════════════════
+	local infoRow = newFrame(explorerPage, {
+		BG=Color3.fromRGB(0,0,0), BT=1,
+		Size=UDim2.new(1,0,0,16), ZIndex=12,
+	})
+	infoRow.LayoutOrder = 3
+	local infLbl = newLabel(infoRow, {
+		Text = "  Ready to explore…",
+		Color = T.TEXT3, Size = 9, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1,0,1,0), ZIndex = 12,
+	})
+	local infoPad = Instance.new("UIPadding", infLbl)
+	infoPad.PaddingLeft = UDim.new(0,8)
+
+	-- ════════════════════════════════════════
+	-- [4] TREE CONTAINER
+	-- ════════════════════════════════════════
 	local treeWrap = newFrame(explorerPage, {
 		BG = T.SURFACE,
-		Size = UDim2.new(1,0,0,10),
+		Size = UDim2.new(0.6,0,0,10),  -- 60% width (left side)
 		ZIndex = 12,
 	})
-	treeWrap.LayoutOrder = 3
+	treeWrap.LayoutOrder = 4
 	treeWrap.AutomaticSize = Enum.AutomaticSize.Y
 	corner(treeWrap, 10)
 	stroke(treeWrap, T.BORDER, 1)
@@ -7013,16 +7388,90 @@ do
 	treeList.SortOrder = Enum.SortOrder.LayoutOrder
 	treeList.Padding = UDim.new(0,0)
 	local treePad = Instance.new("UIPadding", treeWrap)
-	treePad.PaddingTop    = UDim.new(0,4)
-	treePad.PaddingBottom = UDim.new(0,4)
+	treePad.PaddingTop = UDim.new(0,2)
+	treePad.PaddingBottom = UDim.new(0,2)
 
-	-- ── Màu nền xen kẽ ──
-	local function rowBG(depth, selected)
-		if selected then return T.ACCENT end
-		return depth % 2 == 0 and T.SURFACE or T.SURFACE2
+	-- ════════════════════════════════════════
+	-- [5] PROPERTIES PANEL  (right side)
+	-- ════════════════════════════════════════
+	local propWrap = newFrame(explorerPage, {
+		BG = T.SURFACE,
+		Size = UDim2.new(0.38,-2,0,10),  -- 38% width (right side)
+		Position = UDim2.new(0.6,2,0,0),
+		ZIndex = 12,
+	})
+	propWrap.LayoutOrder = 4
+	propWrap.AutomaticSize = Enum.AutomaticSize.Y
+	corner(propWrap, 10)
+	stroke(propWrap, T.BORDER, 1)
+
+	-- Panel header
+	local propHeader = newFrame(propWrap, {
+		BG=T.SURFACE2,
+		Size=UDim2.new(1,0,0,28), ZIndex=13,
+	})
+	corner(propHeader, 8)
+	newLabel(propHeader, {
+		Text="⚙  Properties",
+		Color=T.TEXT, Size=11, Font=Enum.Font.GothamBold,
+		Sz=UDim2.new(1,0,1,0), Position=UDim2.new(0,8,0,0), ZIndex=14,
+	})
+
+	-- Content area
+	local propContent = Instance.new("ScrollingFrame", propWrap)
+	propContent.Size = UDim2.new(1,0,1,-30)
+	propContent.Position = UDim2.new(0,0,0,28)
+	propContent.BackgroundTransparency = 1
+	propContent.BorderSizePixel = 0
+	propContent.ScrollBarThickness = 2
+	propContent.ScrollBarImageColor3 = T.ACCENT
+	propContent.CanvasSize = UDim2.new(0,0,0,0)
+	propContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	propContent.ZIndex = 13
+
+	local propLayout = Instance.new("UIListLayout", propContent)
+	propLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	propLayout.Padding = UDim.new(0,4)
+	local propContentPad = Instance.new("UIPadding", propContent)
+	propContentPad.PaddingTop = UDim.new(0,6)
+	propContentPad.PaddingBottom = UDim.new(0,6)
+	propContentPad.PaddingLeft = UDim.new(0,6)
+	propContentPad.PaddingRight = UDim.new(0,6)
+
+	-- Empty state
+	local emptyProp = newLabel(propWrap, {
+		Text="Select instance\nto view properties",
+		Color=T.TEXT3, Size=9,
+		Wrapped=true,
+		Sz=UDim2.new(1,0,0,36), ZIndex=13,
+		AlignX=Enum.TextXAlignment.Center,
+		AlignY=Enum.TextYAlignment.Center,
+	})
+	local emptyOrder = Instance.new("IntValue", emptyProp)
+	emptyOrder.Name = "LayoutOrder"
+	emptyOrder.Value = 999
+
+	-- ════════════════════════════════════════
+	-- [6] RENDER FUNCTIONS
+	-- ════════════════════════════════════════
+	local nodeOrder = 0
+
+	local function getDisplayPath(inst)
+		local parts = {}
+		local current = inst
+		while current and current ~= game do
+			table.insert(parts, 1, current.Name)
+			current = current.Parent
+		end
+		return table.concat(parts, " > ")
 	end
 
-	-- ── Xóa toàn bộ cây ──
+	local function matchesFilter(inst)
+		if filterClass == "" then return true end
+		if inst:IsA(filterClass) then return true end
+		return false
+	end
+
 	local function clearTree()
 		for _,r in ipairs(nodeRows) do
 			if r and r.Parent then r:Destroy() end
@@ -7030,25 +7479,213 @@ do
 		nodeRows = {}
 	end
 
-	-- ── Render 1 node ──
-	local nodeOrder = 0
+	local function showProperties(inst)
+		-- Clear content
+		for _, c in ipairs(propContent:GetChildren()) do
+			if c:IsA("Frame") or c:IsA("TextLabel") then
+				c:Destroy()
+			end
+		end
+		emptyProp.Visible = false
+
+		selectedPath = getDisplayPath(inst)
+
+		local ord = 0
+		local function o() ord+=1 return ord end
+
+		-- Name & Class
+		local nameRow = newFrame(propContent, {
+			BG=T.SURFACE2, Size=UDim2.new(1,0,0,28), ZIndex=13,
+		})
+		nameRow.LayoutOrder = o()
+		corner(nameRow, 8)
+		newLabel(nameRow, {
+			Text="📛 "..inst.ClassName,
+			Color=T.ACCENT, Size=10, Font=Enum.Font.GothamBold,
+			Sz=UDim2.new(1,-8,0,14), Position=UDim2.new(0,6,0,2), ZIndex=14,
+		})
+		newLabel(nameRow, {
+			Text=inst.Name,
+			Color=T.TEXT, Size=10, Font=Enum.Font.Gotham,
+			Sz=UDim2.new(1,-8,0,12), Position=UDim2.new(0,6,0,14), ZIndex=14, Truncate=true,
+		})
+
+		-- Parent
+		if inst.Parent then
+			local parentRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			parentRow.LayoutOrder = o()
+			corner(parentRow, 8)
+			newLabel(parentRow, {
+				Text="🔗 Parent",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,60,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			newLabel(parentRow, {
+				Text=inst.Parent.Name,
+				Color=T.ACCENT, Size=10, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(1,-68,1,0), Position=UDim2.new(0,68,0,0), ZIndex=14, Truncate=true,
+			})
+		end
+
+		-- Children count
+		local childCount = #inst:GetChildren()
+		if childCount > 0 then
+			local childRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			childRow.LayoutOrder = o()
+			corner(childRow, 8)
+			newLabel(childRow, {
+				Text="👶 Children",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,70,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			newLabel(childRow, {
+				Text=tostring(childCount),
+				Color=T.SUCCESS, Size=11, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(1,-78,1,0), Position=UDim2.new(0,78,0,0), ZIndex=14,
+			})
+		end
+
+		-- Script info
+		if inst:IsA("LocalScript") or inst:IsA("ModuleScript") then
+			local scriptRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			scriptRow.LayoutOrder = o()
+			corner(scriptRow, 8)
+			local ok, size = pcall(function() return #inst.Source end)
+			newLabel(scriptRow, {
+				Text="📝 Size",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,40,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			local sizeStr = ok and (size < 1024 and size.." B" or math.floor(size/1024).." KB") or "?"
+			newLabel(scriptRow, {
+				Text=sizeStr,
+				Color=T.TEXT, Size=10,
+				Sz=UDim2.new(1,-48,1,0), Position=UDim2.new(0,48,0,0), ZIndex=14,
+			})
+		end
+
+		-- Enabled state
+		if inst:FindFirstChildOfClass("LocalScript") or inst:IsA("LocalScript") then
+			local enabledRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			enabledRow.LayoutOrder = o()
+			corner(enabledRow, 8)
+			newLabel(enabledRow, {
+				Text="▶ Enabled",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,60,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			local status = inst.Enabled and "✓ YES" or "✗ NO"
+			local statusColor = inst.Enabled and T.SUCCESS or T.WARN
+			newLabel(enabledRow, {
+				Text=status,
+				Color=statusColor, Size=10, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(1,-68,1,0), Position=UDim2.new(0,68,0,0), ZIndex=14,
+			})
+		end
+
+		-- Custom Properties (BasePart)
+		if inst:IsA("BasePart") then
+			-- Position
+			local pos = inst.Position
+			local posRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			posRow.LayoutOrder = o()
+			corner(posRow, 8)
+			newLabel(posRow, {
+				Text="📍 Position",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,70,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			newLabel(posRow, {
+				Text=string.format("(%.1f, %.1f, %.1f)", pos.X, pos.Y, pos.Z),
+				Color=T.TEXT, Size=9, Font=Enum.Font.Code,
+				Sz=UDim2.new(1,-78,1,0), Position=UDim2.new(0,78,0,0), ZIndex=14, Truncate=true,
+			})
+
+			-- Size
+			local siz = inst.Size
+			local sizRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			sizRow.LayoutOrder = o()
+			corner(sizRow, 8)
+			newLabel(sizRow, {
+				Text="📐 Size",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,60,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			newLabel(sizRow, {
+				Text=string.format("(%.1f, %.1f, %.1f)", siz.X, siz.Y, siz.Z),
+				Color=T.TEXT, Size=9, Font=Enum.Font.Code,
+				Sz=UDim2.new(1,-68,1,0), Position=UDim2.new(0,68,0,0), ZIndex=14, Truncate=true,
+			})
+
+			-- Material
+			local matRow = newFrame(propContent, {
+				BG=T.SURFACE2, Size=UDim2.new(1,0,0,26), ZIndex=13,
+			})
+			matRow.LayoutOrder = o()
+			corner(matRow, 8)
+			newLabel(matRow, {
+				Text="✨ Material",
+				Color=T.TEXT3, Size=9, Font=Enum.Font.GothamBold,
+				Sz=UDim2.new(0,70,1,0), Position=UDim2.new(0,6,0,0), ZIndex=14,
+			})
+			newLabel(matRow, {
+				Text=tostring(inst.Material):gsub("Enum.Material.", ""),
+				Color=T.TEXT, Size=9,
+				Sz=UDim2.new(1,-78,1,0), Position=UDim2.new(0,78,0,0), ZIndex=14, Truncate=true,
+			})
+		end
+
+		-- Copy Path Button
+		local copyRowBtn = Instance.new("TextButton", propContent)
+		copyRowBtn.Size = UDim2.new(1,-12,0,28)
+		copyRowBtn.Text = "📋 Copy Full Path"
+		copyRowBtn.TextSize = 10
+		copyRowBtn.Font = Enum.Font.GothamBold
+		copyRowBtn.TextColor3 = T.WHITE
+		copyRowBtn.BackgroundColor3 = T.ACCENT
+		copyRowBtn.BorderSizePixel = 0
+		copyRowBtn.ZIndex = 14
+		local copyRowOrder = Instance.new("IntValue", copyRowBtn)
+		copyRowOrder.Name = "LayoutOrder"
+		copyRowOrder.Value = o()
+		corner(copyRowBtn, 8)
+		copyRowBtn.MouseEnter:Connect(function() tween(copyRowBtn,{BackgroundColor3=T.ACCENT2}) end)
+		copyRowBtn.MouseLeave:Connect(function() tween(copyRowBtn,{BackgroundColor3=T.ACCENT}) end)
+		copyRowBtn.MouseButton1Click:Connect(function()
+			copyText(selectedPath)
+			showToast("Path copied!", "ok")
+		end)
+	end
+
 	local function renderNode(inst, depth, parentVisible)
 		if not inst then return end
+
 		local children = inst:GetChildren()
 		local hasChildren = #children > 0
 		local isExpanded = expanded[inst] == true
 
-		-- Filter theo search
+		-- Search filter
 		local name = inst.Name
-		local visible = parentVisible
-		if searchQuery ~= "" then
-			visible = name:lower():find(searchQuery:lower(), 1, true) ~= nil
-		end
+		local matchesSearch = (searchQuery == "" or name:lower():find(searchQuery:lower(), 1, true))
+		local visible = parentVisible and matchesSearch and matchesFilter(inst)
 
 		nodeOrder += 1
 		local row = Instance.new("TextButton", treeWrap)
 		row.Size = UDim2.new(1,0,0,26)
-		row.BackgroundColor3 = rowBG(depth, selectedInst == inst)
+		row.BackgroundColor3 = selectedInst == inst and T.ACCENT or
+			(depth % 2 == 0 and T.SURFACE or T.SURFACE2)
 		row.BackgroundTransparency = selectedInst == inst and 0 or 0.3
 		row.Text = ""
 		row.BorderSizePixel = 0
@@ -7058,15 +7695,16 @@ do
 
 		table.insert(nodeRows, row)
 
-		-- Indent line (vertical guide)
+		-- Indent lines
 		if depth > 0 then
 			for d = 1, depth do
-				local line = newFrame(row, {
-					BG = d == depth and T.BORDER2 or T.BORDER,
-					BT = d == depth and 0 or 0.5,
-					Size = UDim2.new(0, 1, 1, 0),
-					Position = UDim2.new(0, 8 + (d-1)*14, 0, 0),
-					ZIndex = 13,
+				local lineColor = (d == depth) and T.BORDER2 or T.BORDER
+				local lineBT = (d == depth) and 0 or 0.5
+				newFrame(row, {
+					BG=lineColor, BT=lineBT,
+					Size=UDim2.new(0,1,1,0),
+					Position=UDim2.new(0, 8 + (d-1)*14, 0, 0),
+					ZIndex=13,
 				})
 			end
 		end
@@ -7077,8 +7715,7 @@ do
 		local arrowLbl = newLabel(row, {
 			Text = hasChildren and (isExpanded and "▾" or "▸") or " ",
 			Color = hasChildren and T.ACCENT or T.TEXT3,
-			Size = 10,
-			Font = Enum.Font.GothamBold,
+			Size = 10, Font = Enum.Font.GothamBold,
 			Sz = UDim2.new(0,14,1,0),
 			Position = UDim2.new(0, indentX, 0, 0),
 			AlignX = Enum.TextXAlignment.Center,
@@ -7086,88 +7723,75 @@ do
 		})
 
 		-- Class icon
-		local iconLbl = newLabel(row, {
+		newLabel(row, {
 			Text = getIcon(inst),
-			Color = T.TEXT2,
-			Size = 11,
+			Color = T.TEXT2, Size = 11,
 			Sz = UDim2.new(0,18,1,0),
 			Position = UDim2.new(0, indentX+15, 0, 0),
 			AlignX = Enum.TextXAlignment.Center,
 			ZIndex = 14,
 		})
 
-		-- Name label
+		-- Name
 		local nameLbl = newLabel(row, {
 			Text = name,
 			Color = selectedInst == inst and T.WHITE or T.TEXT,
 			Size = 11,
 			Font = selectedInst == inst and Enum.Font.GothamBold or Enum.Font.Gotham,
-			Sz = UDim2.new(1, -(indentX+38), 1, 0),
+			Sz = UDim2.new(1, -(indentX+54), 1, 0),
 			Position = UDim2.new(0, indentX+34, 0, 0),
 			ZIndex = 14,
 			Truncate = true,
 		})
 
-		-- ClassName badge (khi selected)
-		if selectedInst == inst then
+		-- Child count badge (nếu có)
+		if hasChildren then
 			local badge = newFrame(row, {
-				BG = T.ACCENT2,
-				BT = 0.3,
-				Size = UDim2.new(0,0,0,16),
-				Position = UDim2.new(1,-4,0.5,-8),
+				BG = T.SURFACE2, BT = 0.2,
+				Size = UDim2.new(0,0,0,14),
+				Position = UDim2.new(1,-4,0.5,-7),
 				ZIndex = 14,
 			})
 			corner(badge, 5)
 			local badgeLbl = newLabel(badge, {
-				Text = inst.ClassName,
-				Color = T.WHITE,
-				Size = 8,
-				Font = Enum.Font.GothamBold,
-				Sz = UDim2.new(1,-8,1,0),
-				Position = UDim2.new(0,4,0,0),
+				Text = tostring(#children),
+				Color = T.ACCENT3, Size = 8, Font = Enum.Font.GothamBold,
+				Sz = UDim2.new(0,10,1,0),
+				Position = UDim2.new(0,2,0,0),
 				AlignX = Enum.TextXAlignment.Center,
 				ZIndex = 15,
 			})
-			-- Auto-size badge
-			task.defer(function()
-				local w = badgeLbl.TextBounds.X + 14
-				badge.Size = UDim2.new(0, w, 0, 16)
-				badge.Position = UDim2.new(1, -(w+4), 0.5, -8)
-				nameLbl.Size = UDim2.new(1, -(indentX+38+w+8), 1, 0)
-			end)
+			badgeLbl.AutomaticSize = Enum.AutomaticSize.X
 		end
 
 		-- Hover
 		row.MouseEnter:Connect(function()
 			if selectedInst ~= inst then
-				tween(row, { BackgroundTransparency = 0.1, BackgroundColor3 = T.GLASS })
+				tween(row, {BackgroundTransparency=0.1, BackgroundColor3=T.GLASS})
 			end
 		end)
 		row.MouseLeave:Connect(function()
 			if selectedInst ~= inst then
-				tween(row, { BackgroundTransparency = 0.3, BackgroundColor3 = rowBG(depth, false) })
+				tween(row, {BackgroundTransparency=0.3})
 			end
 		end)
 
-		-- Click: expand/collapse OR select
+		-- Click
 		local lastClick = 0
 		row.MouseButton1Click:Connect(function()
 			local now = tick()
 			if now - lastClick < 0.3 then
 				-- Double-click: toggle expand
-				if hasChildren then
-					expanded[inst] = not expanded[inst]
-				end
+				if hasChildren then expanded[inst] = not expanded[inst] end
 			else
 				-- Single click: select
 				selectedInst = inst
+				showProperties(inst)
 			end
 			lastClick = now
-			-- Rebuild tree
-			task.defer(function() rebuildTree() end)
+			task.defer(rebuildTree)
 		end)
 
-		-- Render children se xử lý ở rebuildTree
 		return isExpanded, children
 	end
 
@@ -7175,17 +7799,17 @@ do
 	function rebuildTree()
 		clearTree()
 		nodeOrder = 0
-		local totalNodes = 0
+		local totalCount = 0
+		local visibleCount = 0
 
 		local function renderBranch(inst, depth)
-			totalNodes += 1
+			totalCount += 1
 			local isExp, children = renderNode(inst, depth, true)
 			if isExp and children then
-				-- Sort: folders/models first, then alphabetical
 				table.sort(children, function(a,b)
-					local aHas = #a:GetChildren()>0
-					local bHas = #b:GetChildren()>0
-					if aHas ~= bHas then return aHas end
+					local aIsFolder = a:IsA("Folder") or #a:GetChildren()>0
+					local bIsFolder = b:IsA("Folder") or #b:GetChildren()>0
+					if aIsFolder ~= bIsFolder then return aIsFolder end
 					return a.Name < b.Name
 				end)
 				for _, child in ipairs(children) do
@@ -7196,13 +7820,11 @@ do
 
 		for _, svcName in ipairs(ROOT_SERVICES) do
 			local ok, svc = pcall(function() return game:GetService(svcName) end)
-			if ok and svc then
-				renderBranch(svc, 0)
-			end
+			if ok and svc then renderBranch(svc, 0) end
 		end
 
-		countLbl.Text = "  "..totalNodes.." instances   |   " ..
-			(selectedInst and ("selected: "..selectedInst.Name) or "click để chọn · double-click để mở")
+		infLbl.Text = "  "..totalCount.." instances"..
+			(selectedInst and "   |   "..selectedInst.ClassName.." / "..selectedInst.Name or "")
 	end
 
 	-- ── Search ──
@@ -7211,19 +7833,7 @@ do
 		task.defer(rebuildTree)
 	end)
 
-	-- ── Refresh button ──
-	refreshBtn.MouseButton1Click:Connect(function()
-		tween(refreshBtn, { TextColor3 = T.SUCCESS })
-		task.delay(0.6, function() tween(refreshBtn, { TextColor3 = T.ACCENT }) end)
-		searchQuery = ""
-		searchBox.Text = ""
-		selectedInst = nil
-		expanded = {}
-		rebuildTree()
-		showToast("Explorer đã refresh", "ok")
-	end)
-
-	-- Tự động expand root services khi mở trang lần đầu
+	-- Init
 	local explorerInited = false
 	local function initExplorer()
 		if explorerInited then return end
@@ -7237,7 +7847,6 @@ do
 		rebuildTree()
 	end
 
-	-- Hook vào switchPage callback
 	pageCallbacks = pageCallbacks or {}
 	pageCallbacks["Explorer"] = initExplorer
 end
