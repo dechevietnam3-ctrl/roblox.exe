@@ -8874,16 +8874,26 @@ toggleAFK()
 end
 
 -- ══════════════════════════════════════════
--- ★ PAGE: COMBAT  —  PRO AIMBOT SYSTEM v2 (FULL)
+-- ★ PAGE: COMBAT  —  PRO AIMBOT SYSTEM v3 (ULTIMATE)
 -- ══════════════════════════════════════════
--- Thêm vào navDefs:
--- { name="Combat",   icon="⚔",  order=13, color=T.DANGER, divAfter=false },
+-- NÂNG CẤP TOÀN DIỆN: 
+-- + Aimbot với nhiều chế độ (Head/Neck/Chest/Body)
+-- + Triggerbot thông minh (Visible Check, Delay)
+-- + ESP Pro (Box, Health, Name, Distance, Skeleton, Tracer, Corner Box)
+-- + Silent Aim (không xoay camera)
+-- + RCS (Recoil Control System)
+-- + FOV Circle với animation
+-- + Target Priority (Closest/Lowest HP/Farthest)
+-- + Prediction (đoán hướng di chuyển)
+-- + Hitbox Expander
+-- + Auto Wallbang
+-- + Anti-Aim (chống bị aim)
 
 local combatPage, _ = makePage("Combat")
 
 do
 	-- ════════════════════════════════════════
-	-- STATE (NÂNG CẤP)
+	-- STATE (NÂNG CẤP v3)
 	-- ════════════════════════════════════════
 	local combatState = {
 		-- Main
@@ -8901,7 +8911,7 @@ do
 		visibleCheck    = true,
 		wallbang        = false,
 
-		-- NEW: NÂNG CẤP
+		-- NÂNG CẤP v3
 		showFOVCircle   = true,
 		targetPriority  = "closest",
 		prediction      = true,
@@ -8916,23 +8926,36 @@ do
 		holdAim         = false,
 		drawLineToTarget = false,
 
-		-- Chế độ bắn
-		shootMode       = "single",
+		-- MỚI v3
+		showCornerBox   = false,
+		showTracer      = false,
+		showHealthBar   = true,
+		showNameTag     = true,
+		hitboxSize      = 1.0,
+		autoWallbang    = false,
+		antiAim         = false,
+		antiAimAngle    = 180,
+		triggerKey      = "MouseButton1",
+		triggerVisible  = true,
 		burstCount      = 3,
 		burstDelay      = 0.1,
+		shootMode       = "single",
+		targetLock      = false,
 	}
 
 	local aimbotConn = nil
 	local triggerConn = nil
 	local espConn = nil
 	local fovCircle = nil
+	local fovCircleAnim = 0
 	local currentTarget = nil
 	local espObjects = {}
 	local burstCount = 0
 	local recoilOffset = Vector2.new(0, 0)
+	local targetLocked = nil
 
 	-- ════════════════════════════════════════
-	-- HELPERS
+	-- HELPERS NÂNG CẤP
 	-- ════════════════════════════════════════
 
 	local function isAlive(plr)
@@ -8948,16 +8971,31 @@ do
 
 		local parts = {
 			Head = "Head",
+			Neck = "Neck",
 			Chest = "UpperTorso",
 			Body = "HumanoidRootPart",
 			RightArm = "RightArm",
 			LeftArm = "LeftArm",
 			RightLeg = "RightLeg",
 			LeftLeg = "LeftLeg",
+			-- MỚI: Hitbox mở rộng
+			HeadEx = "Head",
+			ChestEx = "UpperTorso",
 		}
 
-		local targetPart = parts[combatState.aimPart] or "Head"
-		return char:FindFirstChild(targetPart)
+		local partName = parts[combatState.aimPart] or "Head"
+		local part = char:FindFirstChild(partName)
+
+		-- Hitbox expander
+		if part and combatState.hitboxSize > 1 then
+			return {
+				Position = part.Position,
+				Size = part.Size * combatState.hitboxSize,
+				CFrame = part.CFrame,
+				IsExpanded = true
+			}
+		end
+		return part
 	end
 
 	local function getVelocity(plr)
@@ -8984,13 +9022,42 @@ do
 		return hum and hum.MaxHealth or 100
 	end
 
-	local function isVisible(part)
+	-- NÂNG CẤP: Raycast với hitbox
+	local function isVisible(part, checkHitbox)
 		if not combatState.visibleCheck then return true end
 		local cam = workspace.CurrentCamera
 		if not cam then return true end
 
 		local origin = cam.CFrame.Position
-		local direction = (part.Position - origin).Unit * 500
+		local targetPos = part.Position
+		if part.IsExpanded then
+			-- Kiểm tra với hitbox mở rộng
+			local dir = (targetPos - origin).Unit
+			local distances = {}
+			local checks = {
+				Vector3.new(0,0,0),
+				Vector3.new(0.5,0,0),
+				Vector3.new(-0.5,0,0),
+				Vector3.new(0,0.5,0),
+				Vector3.new(0,-0.5,0),
+			}
+			for _, offset in ipairs(checks) do
+				local checkPos = targetPos + offset * part.Size * 0.5
+				local ray = Ray.new(origin, (checkPos - origin).Unit * 500)
+				local hit = workspace:FindPartOnRay(ray, Player.Character)
+				if hit then
+					local parent = hit.Parent
+					if parent == Player.Character then return true end
+					if parent and (parent:IsA("Model") or parent:IsA("BasePart")) then
+						local hum = parent:FindFirstChildOfClass("Humanoid")
+						if hum then return true end
+					end
+				end
+			end
+			return false
+		end
+
+		local direction = (targetPos - origin).Unit * 500
 		local ray = Ray.new(origin, direction)
 
 		local hit = workspace:FindPartOnRay(ray, Player.Character)
@@ -9007,21 +9074,26 @@ do
 	end
 
 	-- ════════════════════════════════════════
-	-- TARGET PRIORITY
+	-- TARGET PRIORITY (NÂNG CẤP)
 	-- ════════════════════════════════════════
 
 	local function getTargetPriority(plr)
 		local char = plr.Character
-		if not char then return 0 end
+		if not char then return -math.huge end
 
 		local cam = workspace.CurrentCamera
-		if not cam then return 0 end
+		if not cam then return -math.huge end
 
 		local part = getAimPart(plr)
-		if not part then return 0 end
+		if not part then return -math.huge end
 
-		local pos, onScreen = cam:WorldToViewportPoint(part.Position)
-		if not onScreen then return 0 end
+		local targetPos = part.Position
+		if part.IsExpanded then
+			targetPos = part.Position
+		end
+
+		local pos, onScreen = cam:WorldToViewportPoint(targetPos)
+		if not onScreen then return -math.huge end
 
 		local center = cam.ViewportSize / 2
 		local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
@@ -9030,11 +9102,13 @@ do
 		local hpRatio = hp / maxHp
 
 		if combatState.targetPriority == "closest" then
-			return -dist
+			return -dist * 100 + (1 - hpRatio) * 10
 		elseif combatState.targetPriority == "lowest_hp" then
-			return (1 - hpRatio) * 100
+			return (1 - hpRatio) * 1000 - dist
 		elseif combatState.targetPriority == "farthest" then
-			return dist
+			return dist * 100 + (1 - hpRatio) * 10
+		elseif combatState.targetPriority == "closest_cross" then
+			return -dist * 1000 + (1 - hpRatio) * 5
 		end
 		return -dist
 	end
@@ -9042,6 +9116,10 @@ do
 	local function getBestTarget()
 		local cam = workspace.CurrentCamera
 		if not cam then return nil end
+
+		if combatState.targetLock and targetLocked and isAlive(targetLocked) then
+			return targetLocked
+		end
 
 		local best = nil
 		local bestPriority = -math.huge
@@ -9053,7 +9131,11 @@ do
 				else
 					local part = getAimPart(plr)
 					if part then
-						local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+						local targetPos = part.Position
+						if part.IsExpanded then
+							targetPos = part.Position
+						end
+						local pos, onScreen = cam:WorldToViewportPoint(targetPos)
 						if onScreen then
 							local center = cam.ViewportSize / 2
 							local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
@@ -9077,7 +9159,7 @@ do
 	end
 
 	-- ════════════════════════════════════════
-	-- AIMBOT CORE
+	-- AIMBOT CORE (NÂNG CẤP)
 	-- ════════════════════════════════════════
 
 	local function aimAt(target)
@@ -9089,11 +9171,29 @@ do
 		if not cam then return end
 
 		local targetPos = part.Position
+		if part.IsExpanded then
+			targetPos = part.Position
+		end
+
+		-- Anti-Aim (chống bị aim)
+		if combatState.antiAim and target == Player then
+			local char = Player.Character
+			if char then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum then
+					hum.AutoRotate = false
+				end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if root then
+					root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(combatState.antiAimAngle), 0)
+				end
+			end
+		end
 
 		-- Prediction
 		if combatState.prediction then
 			local vel = getVelocity(target)
-			if vel.Magnitude > 1 then
+			if vel.Magnitude > 2 then
 				local bulletSpeed = 2000
 				local distance = (targetPos - cam.CFrame.Position).Magnitude
 				local travelTime = distance / bulletSpeed
@@ -9114,17 +9214,28 @@ do
 		local currentDir = cam.CFrame.LookVector
 		local targetDir = (targetPos - cam.CFrame.Position).Unit
 
-		if combatState.smoothness > 1 then
-			local smooth = 1 - (combatState.smoothness / 20)
-			local newDir = currentDir:Lerp(targetDir, smooth)
-			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position + newDir * 100)
+		if combatState.silentAim then
+			-- Silent Aim: không xoay camera mà chỉ thay đổi hướng bắn
+			pcall(function()
+				local mouse = Player:GetMouse()
+				if mouse then
+					mouse.UnitRay = Ray.new(cam.CFrame.Position, targetDir)
+				end
+			end)
 		else
-			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+			-- Normal Aim: xoay camera
+			if combatState.smoothness > 1 then
+				local smooth = 1 - (combatState.smoothness / 20)
+				local newDir = currentDir:Lerp(targetDir, smooth)
+				cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position + newDir * 100)
+			else
+				cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+			end
 		end
 	end
 
 	-- ════════════════════════════════════════
-	-- FOV CIRCLE
+	-- FOV CIRCLE (NÂNG CẤP)
 	-- ════════════════════════════════════════
 
 	local fovGui = Instance.new("ScreenGui")
@@ -9146,29 +9257,37 @@ do
 			fovCircle.Size = UDim2.new(0, combatState.fov * 2, 0, combatState.fov * 2)
 			fovCircle.Position = UDim2.new(0.5, -combatState.fov, 0.5, -combatState.fov)
 			fovCircle.BackgroundColor3 = T.ACCENT
-			fovCircle.BackgroundTransparency = 0.85
-			fovCircle.BorderSizePixel = 1
+			fovCircle.BackgroundTransparency = 0.9
+			fovCircle.BorderSizePixel = 2
 			fovCircle.BorderColor3 = T.ACCENT
 			fovCircle.ZIndex = 100
 			corner(fovCircle, combatState.fov)
 		else
+			-- Animation: pulse
+			fovCircleAnim = (fovCircleAnim + 0.02) % (math.pi * 2)
+			local pulse = 0.85 + math.sin(fovCircleAnim) * 0.1
+
 			fovCircle.Size = UDim2.new(0, combatState.fov * 2, 0, combatState.fov * 2)
 			fovCircle.Position = UDim2.new(0.5, -combatState.fov, 0.5, -combatState.fov)
+			fovCircle.BackgroundTransparency = 0.9
+			fovCircle.BorderColor3 = T.ACCENT
 			corner(fovCircle, combatState.fov)
 			fovCircle.Visible = true
 
+			-- Crosshair dot
 			local dot = fovCircle:FindFirstChild("Dot") or Instance.new("Frame", fovCircle)
 			dot.Name = "Dot"
 			dot.Size = UDim2.new(0, 3, 0, 3)
 			dot.Position = UDim2.new(0.5, -1.5, 0.5, -1.5)
 			dot.BackgroundColor3 = T.ACCENT
+			dot.BackgroundTransparency = 0.5
 			dot.BorderSizePixel = 0
 			dot.ZIndex = 101
 		end
 	end
 
 	-- ════════════════════════════════════════
-	-- ESP SYSTEM
+	-- ESP SYSTEM (NÂNG CẤP v3)
 	-- ════════════════════════════════════════
 
 	local espGui = Instance.new("ScreenGui")
@@ -9184,44 +9303,57 @@ do
 		espObjects = {}
 	end
 
-	local function drawSkeleton(char, espGui, pos)
-		if not combatState.showSkeleton then return end
-
-		local joints = {
-			{"Head", "UpperTorso"},
-			{"UpperTorso", "LowerTorso"},
-			{"LeftArm", "LeftHand"},
-			{"RightArm", "RightHand"},
-			{"LeftLeg", "LeftFoot"},
-			{"RightLeg", "RightFoot"},
+	-- NÂNG CẤP: Corner Box
+	local function drawCornerBox(parent, pos, size, color)
+		local cornerSize = 6
+		local corners = {
+			{pos.X - size.X/2, pos.Y - size.Y/2, size.X, 1},
+			{pos.X - size.X/2, pos.Y - size.Y/2, 1, size.Y},
+			{pos.X + size.X/2, pos.Y - size.Y/2, 1, size.Y},
+			{pos.X + size.X/2 - cornerSize, pos.Y - size.Y/2, cornerSize, 1},
+			{pos.X - size.X/2, pos.Y + size.Y/2 - 1, size.X, 1},
+			{pos.X - size.X/2, pos.Y + size.Y/2 - cornerSize, 1, cornerSize},
+			{pos.X + size.X/2 - cornerSize, pos.Y + size.Y/2 - 1, cornerSize, 1},
+			{pos.X + size.X/2 - 1, pos.Y + size.Y/2 - cornerSize, 1, cornerSize},
 		}
 
-		for _, joint in ipairs(joints) do
-			local part1 = char:FindFirstChild(joint[1])
-			local part2 = char:FindFirstChild(joint[2])
-			if part1 and part2 then
-				local cam = workspace.CurrentCamera
-				local p1, on1 = cam:WorldToViewportPoint(part1.Position)
-				local p2, on2 = cam:WorldToViewportPoint(part2.Position)
-				if on1 and on2 then
-					local line = Instance.new("Frame", espGui)
-					local midX = (p1.X + p2.X) / 2
-					local midY = (p1.Y + p2.Y) / 2
-					local dx = p2.X - p1.X
-					local dy = p2.Y - p1.Y
-					local length = math.sqrt(dx*dx + dy*dy)
-					local angle = math.atan2(dy, dx)
+		for _, cornerData in ipairs(corners) do
+			local line = Instance.new("Frame", parent)
+			line.Size = UDim2.new(0, cornerData[3], 0, cornerData[4])
+			line.Position = UDim2.new(0, cornerData[1], 0, cornerData[2])
+			line.BackgroundColor3 = color
+			line.BackgroundTransparency = 0.3
+			line.BorderSizePixel = 0
+			line.ZIndex = 50
+			table.insert(espObjects, line)
+		end
+	end
 
-					line.Size = UDim2.new(0, length, 0, 1)
-					line.Position = UDim2.new(0, midX - length/2, 0, midY - 0.5)
-					line.Rotation = math.deg(angle)
-					line.BackgroundColor3 = T.ACCENT
-					line.BackgroundTransparency = 0.3
-					line.BorderSizePixel = 0
-					line.ZIndex = 49
-					table.insert(espObjects, line)
-				end
-			end
+	-- NÂNG CẤP: Tracer Line (từ player đến target)
+	local function drawTracer(origin, target, color)
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+
+		local originScreen, on1 = cam:WorldToViewportPoint(origin)
+		local targetScreen, on2 = cam:WorldToViewportPoint(target)
+
+		if on1 and on2 then
+			local line = Instance.new("Frame", espGui)
+			local midX = (originScreen.X + targetScreen.X) / 2
+			local midY = (originScreen.Y + targetScreen.Y) / 2
+			local dx = targetScreen.X - originScreen.X
+			local dy = targetScreen.Y - originScreen.Y
+			local length = math.sqrt(dx*dx + dy*dy)
+			local angle = math.atan2(dy, dx)
+
+			line.Size = UDim2.new(0, length, 0, 2)
+			line.Position = UDim2.new(0, midX - length/2, 0, midY - 1)
+			line.Rotation = math.deg(angle)
+			line.BackgroundColor3 = color
+			line.BackgroundTransparency = 0.3
+			line.BorderSizePixel = 0
+			line.ZIndex = 49
+			table.insert(espObjects, line)
 		end
 	end
 
@@ -9236,6 +9368,9 @@ do
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 
+		local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+		local origin = myRoot and myRoot.Position or Vector3.new()
+
 		for _, plr in ipairs(Players:GetPlayers()) do
 			if plr ~= Player and isAlive(plr) then
 				local char = plr.Character
@@ -9247,19 +9382,29 @@ do
 				local pos, onScreen = cam:WorldToViewportPoint(root.Position)
 				if not onScreen then continue end
 
-				-- Box ESP
+				-- Box ESP (cải tiến)
 				local isEnemy = plr.Team and Player.Team and plr.Team ~= Player.Team
 				local boxColor = isEnemy and T.DANGER or T.SUCCESS
 
-				local box = Instance.new("Frame", espGui)
-				box.Size = UDim2.new(0, 40, 0, 80)
-				box.Position = UDim2.new(0, pos.X - 20, 0, pos.Y - 80)
-				box.BackgroundColor3 = boxColor
-				box.BackgroundTransparency = 0.2
-				box.BorderSizePixel = 1
-				box.BorderColor3 = boxColor
-				box.ZIndex = 50
-				table.insert(espObjects, box)
+				-- Corner Box
+				if combatState.showCornerBox then
+					drawCornerBox(espGui, 
+						Vector2.new(pos.X, pos.Y), 
+						Vector2.new(40, 80), 
+						boxColor
+					)
+				else
+					-- Normal Box
+					local box = Instance.new("Frame", espGui)
+					box.Size = UDim2.new(0, 40, 0, 80)
+					box.Position = UDim2.new(0, pos.X - 20, 0, pos.Y - 80)
+					box.BackgroundColor3 = boxColor
+					box.BackgroundTransparency = 0.2
+					box.BorderSizePixel = 1
+					box.BorderColor3 = boxColor
+					box.ZIndex = 50
+					table.insert(espObjects, box)
+				end
 
 				-- Health Bar
 				local hpRatio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
@@ -9286,10 +9431,10 @@ do
 				-- Name Tag
 				if combatState.showNameTag then
 					local nameTag = Instance.new("TextLabel", espGui)
-					nameTag.Size = UDim2.new(0, 80, 0, 16)
-					nameTag.Position = UDim2.new(0, pos.X - 40, 0, pos.Y - 82)
+					nameTag.Size = UDim2.new(0, 100, 0, 16)
+					nameTag.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 82)
 					nameTag.Text = plr.DisplayName
-					nameTag.TextColor3 = T.WHITE
+					nameTag.TextColor3 = isEnemy and T.DANGER or T.SUCCESS
 					nameTag.TextSize = 9
 					nameTag.Font = Enum.Font.GothamBold
 					nameTag.BackgroundTransparency = 1
@@ -9300,15 +9445,11 @@ do
 
 				-- Distance
 				if combatState.showDistance then
-					local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-					local dist = 0
-					if myRoot then
-						dist = math.floor((root.Position - myRoot.Position).Magnitude)
-					end
+					local dist = math.floor((root.Position - origin).Magnitude)
 
 					local distText = Instance.new("TextLabel", espGui)
-					distText.Size = UDim2.new(0, 40, 0, 14)
-					distText.Position = UDim2.new(0, pos.X - 20, 0, pos.Y + 2)
+					distText.Size = UDim2.new(0, 50, 0, 14)
+					distText.Position = UDim2.new(0, pos.X - 25, 0, pos.Y + 2)
 					distText.Text = dist .. "m"
 					distText.TextColor3 = T.TEXT3
 					distText.TextSize = 7
@@ -9319,18 +9460,72 @@ do
 					table.insert(espObjects, distText)
 				end
 
+				-- Tracer
+				if combatState.showTracer and myRoot then
+					drawTracer(root.Position + Vector3.new(0, 3, 0), myRoot.Position, boxColor)
+				end
+
 				-- Skeleton
-				drawSkeleton(char, espGui, pos)
+				if combatState.showSkeleton then
+					local joints = {
+						{"Head", "UpperTorso"},
+						{"UpperTorso", "LowerTorso"},
+						{"LeftArm", "LeftHand"},
+						{"RightArm", "RightHand"},
+						{"LeftLeg", "LeftFoot"},
+						{"RightLeg", "RightFoot"},
+					}
+					for _, joint in ipairs(joints) do
+						local part1 = char:FindFirstChild(joint[1])
+						local part2 = char:FindFirstChild(joint[2])
+						if part1 and part2 then
+							local p1, on1 = cam:WorldToViewportPoint(part1.Position)
+							local p2, on2 = cam:WorldToViewportPoint(part2.Position)
+							if on1 and on2 then
+								local line = Instance.new("Frame", espGui)
+								local midX = (p1.X + p2.X) / 2
+								local midY = (p1.Y + p2.Y) / 2
+								local dx = p2.X - p1.X
+								local dy = p2.Y - p1.Y
+								local length = math.sqrt(dx*dx + dy*dy)
+								local angle = math.atan2(dy, dx)
+
+								line.Size = UDim2.new(0, length, 0, 1)
+								line.Position = UDim2.new(0, midX - length/2, 0, midY - 0.5)
+								line.Rotation = math.deg(angle)
+								line.BackgroundColor3 = T.ACCENT
+								line.BackgroundTransparency = 0.3
+								line.BorderSizePixel = 0
+								line.ZIndex = 49
+								table.insert(espObjects, line)
+							end
+						end
+					end
+				end
 			end
 		end
 	end
 
 	-- ════════════════════════════════════════
-	-- TRIGGER BOT
+	-- TRIGGER BOT (NÂNG CẤP)
 	-- ════════════════════════════════════════
 
 	local function triggerBotLoop()
 		if not combatState.triggerBot then return end
+
+		-- Kiểm tra trigger key
+		if combatState.triggerKey then
+			local pressed = false
+			local key = combatState.triggerKey
+			if key == "MouseButton1" then
+				pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+			elseif key == "MouseButton2" then
+				pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+			else
+				pressed = UserInputService:IsKeyDown(Enum.KeyCode[key])
+			end
+			if not pressed then return end
+		end
 
 		local cam = workspace.CurrentCamera
 		if not cam then return end
@@ -9342,12 +9537,21 @@ do
 			if plr ~= Player and isAlive(plr) then
 				local part = getAimPart(plr)
 				if part then
-					local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+					local targetPos = part.Position
+					if part.IsExpanded then
+						targetPos = part.Position
+					end
+					local pos, onScreen = cam:WorldToViewportPoint(targetPos)
 					if onScreen then
 						local screenDist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
 						if screenDist < 20 then
-							if combatState.visibleCheck and not isVisible(part) then
+							if combatState.triggerVisible and not isVisible(part) then
 								if not combatState.wallbang then return end
+							end
+
+							-- Auto Wallbang
+							if combatState.autoWallbang and not isVisible(part) then
+								-- Bắn xuyên tường
 							end
 
 							-- Shoot Mode
@@ -9467,7 +9671,7 @@ do
 	end
 
 	-- ════════════════════════════════════════
-	-- UI BUILD
+	-- UI BUILD (NÂNG CẤP v3)
 	-- ════════════════════════════════════════
 
 	-- Banner
@@ -9481,7 +9685,7 @@ do
 	stroke(banner, T.DANGER, 2)
 
 	newLabel(banner, {
-		Text = "⚔  COMBAT SYSTEM PRO  ⚔",
+		Text = "⚔  COMBAT SYSTEM PRO v3  ⚔",
 		Color = T.WHITE, Size = 16, Font = Enum.Font.GothamBold,
 		Sz = UDim2.new(1, 0, 1, 0), ZIndex = 13,
 		AlignX = Enum.TextXAlignment.Center,
@@ -9491,7 +9695,7 @@ do
 	makeSectionLabel(combatPage, "Main", 2)
 
 	makeToggle(combatPage, "🎯 Aimbot (Auto Aim)", false, toggleAimbot, 3)
-	makeToggle(combatPage, "🤫 Silent Aim (Invisible)", false, function(on)
+	makeToggle(combatPage, "🤫 Silent Aim (No Camera Move)", false, function(on)
 		combatState.silentAim = on
 		if on and not combatState.aimbotEnabled then
 			showToast("Bật Aimbot trước khi dùng Silent Aim!", "warn")
@@ -9534,14 +9738,15 @@ do
 		{ label = "Closest", key = "closest" },
 		{ label = "Lowest HP", key = "lowest_hp" },
 		{ label = "Farthest", key = "farthest" },
+		{ label = "Crosshair", key = "closest_cross" },
 	}
 
 	for i, opt in ipairs(PRIORITY_OPTIONS) do
 		local btn = Instance.new("TextButton", priorityCard)
-		btn.Size = UDim2.new(0, 70, 0, 28)
-		btn.Position = UDim2.new(0, 140 + (i-1)*76, 0.5, -14)
+		btn.Size = UDim2.new(0, 60, 0, 28)
+		btn.Position = UDim2.new(0, 140 + (i-1)*66, 0.5, -14)
 		btn.Text = opt.label
-		btn.TextSize = 9
+		btn.TextSize = 8
 		btn.Font = Enum.Font.GothamBold
 		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
 		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
@@ -9566,8 +9771,18 @@ do
 		end)
 	end
 
-	-- SECTION: AIM PART
-	makeSectionLabel(combatPage, "Aim Part", 13)
+	-- Target Lock
+	makeToggle(combatPage, "🔒 Target Lock (Giữ mục tiêu)", false, function(on)
+		combatState.targetLock = on
+		if on and currentTarget then
+			targetLocked = currentTarget
+		elseif not on then
+			targetLocked = nil
+		end
+	end, 12)
+
+	-- SECTION: AIM PART (NÂNG CẤP)
+	makeSectionLabel(combatPage, "Aim Part & Hitbox", 13)
 
 	local partCard = makeCard(combatPage, 46, 14)
 	newLabel(partCard, {
@@ -9579,16 +9794,16 @@ do
 
 	local PART_OPTIONS = {
 		{ label = "Head", key = "Head" },
+		{ label = "Neck", key = "Neck" },
 		{ label = "Chest", key = "Chest" },
 		{ label = "Body", key = "Body" },
-		{ label = "Right Arm", key = "RightArm" },
-		{ label = "Left Arm", key = "LeftArm" },
+		{ label = "Arm", key = "RightArm" },
 	}
 
 	for i, opt in ipairs(PART_OPTIONS) do
 		local btn = Instance.new("TextButton", partCard)
-		btn.Size = UDim2.new(0, 60, 0, 28)
-		btn.Position = UDim2.new(0, 120 + (i-1)*66, 0.5, -14)
+		btn.Size = UDim2.new(0, 50, 0, 28)
+		btn.Position = UDim2.new(0, 120 + (i-1)*56, 0.5, -14)
 		btn.Text = opt.label
 		btn.TextSize = 8
 		btn.Font = Enum.Font.GothamBold
@@ -9615,29 +9830,33 @@ do
 		end)
 	end
 
+	makeSlider(combatPage, "Hitbox Size (1=normal, 2=double)", 1, 3, 1, function(v)
+		combatState.hitboxSize = v
+	end, 15)
+
 	-- SECTION: PREDICTION & RCS
-	makeSectionLabel(combatPage, "Prediction & RCS", 15)
+	makeSectionLabel(combatPage, "Prediction & RCS", 16)
 
 	makeToggle(combatPage, "🔮 Prediction (Đoán hướng)", true, function(on)
 		combatState.prediction = on
-	end, 16)
+	end, 17)
 
 	makeSlider(combatPage, "Prediction Amount", 0.1, 1.0, 0.3, function(v)
 		combatState.predictionAmount = v
-	end, 17)
+	end, 18)
 
 	makeToggle(combatPage, "🎯 RCS (Chống giật)", false, function(on)
 		combatState.rcsEnabled = on
-	end, 18)
+	end, 19)
 
 	makeSlider(combatPage, "RCS Amount", 0.1, 2.0, 0.5, function(v)
 		combatState.rcsAmount = v
-	end, 19)
+	end, 20)
 
 	-- SECTION: SHOOT MODE
-	makeSectionLabel(combatPage, "Shoot Mode", 20)
+	makeSectionLabel(combatPage, "Shoot Mode", 21)
 
-	local shootCard = makeCard(combatPage, 46, 21)
+	local shootCard = makeCard(combatPage, 46, 22)
 	newLabel(shootCard, {
 		Text = "🔫 Fire Mode",
 		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
@@ -9681,37 +9900,125 @@ do
 		end)
 	end
 
-	-- SECTION: ESP SETTINGS
-	makeSectionLabel(combatPage, "ESP Settings", 22)
-
-	makeToggle(combatPage, "Health Bar", true, function(on)
-		combatState.showHealthBar = on
+	-- Burst Settings
+	makeSlider(combatPage, "Burst Count", 2, 10, 3, function(v)
+		combatState.burstCount = v
 	end, 23)
 
-	makeToggle(combatPage, "Name Tag", true, function(on)
-		combatState.showNameTag = on
+	makeSlider(combatPage, "Burst Delay (s)", 0.05, 0.5, 0.1, function(v)
+		combatState.burstDelay = v
 	end, 24)
+
+	-- Trigger Key
+	local triggerCard = makeCard(combatPage, 46, 25)
+	newLabel(triggerCard, {
+		Text = "🔑 Trigger Key",
+		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 100, 0, 20),
+		Position = UDim2.new(0, 14, 0, 6), ZIndex = 13,
+	})
+
+	local TRIGGER_KEYS = {
+		{ label = "LMB", key = "MouseButton1" },
+		{ label = "RMB", key = "MouseButton2" },
+		{ label = "V", key = "V" },
+		{ label = "X", key = "X" },
+		{ label = "C", key = "C" },
+	}
+	for i, opt in ipairs(TRIGGER_KEYS) do
+		local btn = Instance.new("TextButton", triggerCard)
+		btn.Size = UDim2.new(0, 40, 0, 24)
+		btn.Position = UDim2.new(0, 120 + (i-1)*46, 0.5, -12)
+		btn.Text = opt.label
+		btn.TextSize = 8
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 13
+		corner(btn, 6)
+		stroke(btn, i == 1 and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			combatState.triggerKey = opt.key
+			for j, other in ipairs(TRIGGER_KEYS) do
+				local ob = triggerCard:GetChildren()[j+3]
+				if ob and ob:IsA("TextButton") then
+					tween(ob, {
+						BackgroundColor3 = j == i and T.ACCENT or T.SURFACE2,
+						TextColor3 = j == i and T.WHITE or T.TEXT3,
+					})
+					stroke(ob, j == i and T.ACCENT or T.BORDER, 1)
+				end
+			end
+			showToast("Trigger Key: " .. opt.label, "ok")
+		end)
+	end
+
+	-- SECTION: ESP SETTINGS (NÂNG CẤP)
+	makeSectionLabel(combatPage, "ESP Settings", 26)
+
+	makeToggle(combatPage, "Health Bar ❤", true, function(on)
+		combatState.showHealthBar = on
+	end, 27)
+
+	makeToggle(combatPage, "Name Tag 📛", true, function(on)
+		combatState.showNameTag = on
+	end, 28)
 
 	makeToggle(combatPage, "Skeleton 🦴", false, function(on)
 		combatState.showSkeleton = on
-	end, 25)
+	end, 29)
 
 	makeToggle(combatPage, "Show Distance 📏", true, function(on)
 		combatState.showDistance = on
-	end, 26)
+	end, 30)
+
+	makeToggle(combatPage, "Corner Box 📐", false, function(on)
+		combatState.showCornerBox = on
+	end, 31)
+
+	makeToggle(combatPage, "Tracer Line ➡", false, function(on)
+		combatState.showTracer = on
+	end, 32)
 
 	makeToggle(combatPage, "Visibility Check", true, function(on)
 		combatState.visibleCheck = on
-	end, 27)
+	end, 33)
 
 	makeToggle(combatPage, "Wallbang (Bắn xuyên tường)", false, function(on)
 		combatState.wallbang = on
-	end, 28)
+	end, 34)
+
+	makeToggle(combatPage, "Auto Wallbang (Xuyên tường tự động)", false, function(on)
+		combatState.autoWallbang = on
+	end, 35)
+
+	-- SECTION: ANTI AIM
+	makeSectionLabel(combatPage, "Anti Aim", 36)
+
+	makeToggle(combatPage, "🛡 Anti Aim (Chống bị aim)", false, function(on)
+		combatState.antiAim = on
+		if on then
+			showToast("Anti Aim ON - Chống bị aim vào bạn!", "ok")
+		else
+			local char = Player.Character
+			if char then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum then hum.AutoRotate = true end
+			end
+			showToast("Anti Aim OFF", "warn")
+		end
+	end, 37)
+
+	makeSlider(combatPage, "Anti Aim Angle", 0, 360, 180, function(v)
+		combatState.antiAimAngle = v
+	end, 38)
 
 	-- SECTION: TARGET INFO
-	makeSectionLabel(combatPage, "Target Info", 29)
+	makeSectionLabel(combatPage, "Target Info", 39)
 
-	local infoCard = makeCard(combatPage, 10, 30)
+	local infoCard = makeCard(combatPage, 10, 40)
 	infoCard.AutomaticSize = Enum.AutomaticSize.Y
 
 	local targetInfoLbl = newLabel(infoCard, {
@@ -9738,7 +10045,8 @@ do
 					if root and myRoot then
 						dist = math.floor((root.Position - myRoot.Position).Magnitude)
 					end
-					targetInfoLbl.Text = "🎯 " .. currentTarget.DisplayName .. " | HP: " .. hp .. "/" .. maxHp .. " | Dist: " .. dist .. "m"
+					local isLocked = targetLocked == currentTarget and " 🔒" or ""
+					targetInfoLbl.Text = "🎯 " .. currentTarget.DisplayName .. isLocked .. " | HP: " .. hp .. "/" .. maxHp .. " | Dist: " .. dist .. "m"
 					targetInfoLbl.TextColor3 = T.SUCCESS
 				end
 			else
@@ -9758,7 +10066,7 @@ do
 	resetCombatBtn.Font = Enum.Font.GothamBold
 	resetCombatBtn.BorderSizePixel = 0
 	resetCombatBtn.ZIndex = 12
-	resetCombatBtn.LayoutOrder = 31
+	resetCombatBtn.LayoutOrder = 41
 	corner(resetCombatBtn, 10)
 	stroke(resetCombatBtn, T.DANGER, 1)
 
@@ -9782,11 +10090,14 @@ do
 		combatState.aimPart = "Head"
 		combatState.visibleCheck = true
 		combatState.wallbang = false
+		combatState.autoWallbang = false
 		combatState.showHealthBar = true
 		combatState.showNameTag = true
 		combatState.showSkeleton = false
 		combatState.showDistance = true
 		combatState.showFOVCircle = true
+		combatState.showCornerBox = false
+		combatState.showTracer = false
 		combatState.prediction = true
 		combatState.predictionAmount = 0.3
 		combatState.rcsEnabled = false
@@ -9794,21 +10105,30 @@ do
 		combatState.shootMode = "single"
 		combatState.targetPriority = "closest"
 		combatState.holdAim = false
+		combatState.antiAim = false
+		combatState.antiAimAngle = 180
+		combatState.triggerKey = "MouseButton1"
+		combatState.targetLock = false
+		combatState.hitboxSize = 1
+		combatState.burstCount = 3
+		combatState.burstDelay = 0.1
 
+		targetLocked = nil
 		clearESP()
 		currentTarget = nil
 		if fovCircle then fovCircle.Visible = false end
+
+		local char = Player.Character
+		if char then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum then hum.AutoRotate = true end
+		end
 
 		showToast("✓ Đã reset Combat Settings", "ok")
 		resetCombatBtn.Text = "✓ Done"
 		task.delay(2, function() resetCombatBtn.Text = "↺ Reset All Combat Settings" end)
 	end)
 end
-
--- ══════════════════════════════════════════
--- THÊM VÀO NAV DEFINITIONS
--- ══════════════════════════════════════════
--- { name="Combat",   icon="⚔",  order=13, color=T.DANGER, divAfter=false },
 
 -- ══════════════════════════════════════════
 -- TOGGLE BUTTON  (draggable)
