@@ -3853,7 +3853,9 @@ do
 			Lighting.Brightness=2; showToast("Night Vision OFF","warn")
 		end
 	end, 35)
-
+	
+	
+	
 	-- ════════════════════════════════════════
 	-- RESET BUTTON
 	-- ════════════════════════════════════════
@@ -7966,4 +7968,4 @@ task.spawn(function()
 			task.wait(1.8)
 		end
 	end)
-end)
+end)  
