@@ -889,8 +889,9 @@ local navDefs = {
 	{ name="Console",   icon="📝", order=9,  color=T.SUCCESS, divAfter=false },
 	{ name="AntiCheat", icon="🛡", order=10, color=T.DANGER,  divAfter=true  },  -- divider
 	{ name="Keybinds",  icon="⌨",  order=11, color=T.ACCENT,  divAfter=false },
+	{ name="Scripts",   icon="📝", order=12, color=T.SUCCESS, divAfter=false },
+	{ name="Combat",   icon="⚔",  order=13, color=T.DANGER, divAfter=false },
 }
-
 -- ── Divider helper ──
 local function makeNavDivider(parent, order)
 	local div = newFrame(parent, {
@@ -2863,6 +2864,401 @@ do
 		_G._NovaToastEnabled = on
 	end, 29)
 
+	-- ══════════════════════════════════════════
+	-- ★ PAGE: SETTINGS  —  MAP CONTROLLER (Mới)
+	-- ══════════════════════════════════════════
+	-- Chèn vào cuối phần Settings Page (trước phần About & Reset)
+
+	-- ══════════════════════════════════════════
+	-- SECTION: MAP CONTROLLER
+	-- ══════════════════════════════════════════
+	makeSectionLabel(settingsPage, "🗺️ Map Controller", 30)
+
+	local mapCard = makeCard(settingsPage, 180, 31)
+	gradient(mapCard, Color3.fromRGB(18, 22, 40), Color3.fromRGB(12, 16, 28), 135)
+	stroke(mapCard, T.ACCENT3, 1)
+
+	-- Header
+	newLabel(mapCard, {
+		Text = "🗺️  Thay Đổi & Phá Hủy Map",
+		Color = T.WHITE, Size = 13, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+	newLabel(mapCard, {
+		Text = "Load map mới từ Asset ID hoặc xóa toàn bộ workspace",
+		Color = T.TEXT3, Size = 9,
+		Sz = UDim2.new(1, -20, 0, 16),
+		Position = UDim2.new(0, 12, 0, 24), ZIndex = 13,
+	})
+
+	-- ── Row 1: Load map bằng ID ──
+	local loadRow = newFrame(mapCard, {
+		BG = T.SURFACE2,
+		Size = UDim2.new(1, -24, 0, 34),
+		Position = UDim2.new(0, 12, 0, 44),
+		ZIndex = 13,
+	})
+	corner(loadRow, 8)
+	stroke(loadRow, T.BORDER, 1)
+
+	newLabel(loadRow, {
+		Text = "📦 Map ID",
+		Color = T.TEXT2, Size = 9, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 55, 1, 0),
+		Position = UDim2.new(0, 8, 0, 0), ZIndex = 14,
+	})
+
+	local mapIdBox = Instance.new("TextBox", loadRow)
+	mapIdBox.Size = UDim2.new(1, -170, 0, 24)
+	mapIdBox.Position = UDim2.new(0, 62, 0.5, -12)
+	mapIdBox.BackgroundColor3 = T.SURFACE
+	mapIdBox.BorderSizePixel = 0
+	mapIdBox.TextColor3 = T.TEXT
+	mapIdBox.PlaceholderText = "Nhập Asset ID (vd: 159454296)"
+	mapIdBox.PlaceholderColor3 = T.TEXT3
+	mapIdBox.Text = ""
+	mapIdBox.TextSize = 10
+	mapIdBox.Font = Enum.Font.Gotham
+	mapIdBox.ClearTextOnFocus = false
+	mapIdBox.ZIndex = 14
+	corner(mapIdBox, 6)
+	stroke(mapIdBox, T.BORDER, 1)
+	local mPad = Instance.new("UIPadding", mapIdBox)
+	mPad.PaddingLeft = UDim.new(0, 6)
+
+	local loadMapBtn = Instance.new("TextButton", loadRow)
+	loadMapBtn.Size = UDim2.new(0, 56, 0, 24)
+	loadMapBtn.Position = UDim2.new(1, -62, 0.5, -12)
+	loadMapBtn.Text = "⬇ Load"
+	loadMapBtn.TextSize = 9
+	loadMapBtn.Font = Enum.Font.GothamBold
+	loadMapBtn.TextColor3 = T.WHITE
+	loadMapBtn.BackgroundColor3 = T.ACCENT
+	loadMapBtn.BorderSizePixel = 0
+	loadMapBtn.ZIndex = 14
+	corner(loadMapBtn, 6)
+
+	loadMapBtn.MouseEnter:Connect(function() tween(loadMapBtn,{BackgroundColor3=T.ACCENT2}) end)
+	loadMapBtn.MouseLeave:Connect(function() tween(loadMapBtn,{BackgroundColor3=T.ACCENT}) end)
+
+	-- ── Row 2: Clear Map / Reset ──
+	local actionRow = newFrame(mapCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -24, 0, 34),
+		Position = UDim2.new(0, 12, 0, 82),
+		ZIndex = 13,
+	})
+
+	local clearMapBtn = Instance.new("TextButton", actionRow)
+	clearMapBtn.Size = UDim2.new(0, 100, 0, 28)
+	clearMapBtn.Position = UDim2.new(0, 0, 0.5, -14)
+	clearMapBtn.Text = "💥 Clear Map"
+	clearMapBtn.TextSize = 10
+	clearMapBtn.Font = Enum.Font.GothamBold
+	clearMapBtn.TextColor3 = T.WHITE
+	clearMapBtn.BackgroundColor3 = T.DANGER
+	clearMapBtn.BorderSizePixel = 0
+	clearMapBtn.ZIndex = 14
+	corner(clearMapBtn, 8)
+
+	local resetMapBtn = Instance.new("TextButton", actionRow)
+	resetMapBtn.Size = UDim2.new(0, 100, 0, 28)
+	resetMapBtn.Position = UDim2.new(0, 108, 0.5, -14)
+	resetMapBtn.Text = "↺ Reset Map"
+	resetMapBtn.TextSize = 10
+	resetMapBtn.Font = Enum.Font.GothamBold
+	resetMapBtn.TextColor3 = T.WHITE
+	resetMapBtn.BackgroundColor3 = Color3.fromRGB(40, 50, 40)
+	resetMapBtn.BorderSizePixel = 0
+	resetMapBtn.ZIndex = 14
+	corner(resetMapBtn, 8)
+
+	-- ── Row 3: Thông tin map hiện tại ──
+	local infoRow2 = newFrame(mapCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -24, 0, 28),
+		Position = UDim2.new(0, 12, 0, 120),
+		ZIndex = 13,
+	})
+
+	local mapStatusLbl = newLabel(infoRow2, {
+		Text = "📍 Map hiện tại: " .. workspace.Name .. " | " .. #workspace:GetChildren() .. " objects",
+		Color = T.TEXT2, Size = 9,
+		Sz = UDim2.new(1, -12, 1, 0),
+		Position = UDim2.new(0, 8, 0, 0), ZIndex = 14,
+	})
+
+	-- ── PROGRESS BAR khi load map ──
+	local loadProgress = newFrame(mapCard, {
+		BG = T.SURFACE2,
+		Size = UDim2.new(1, -24, 0, 4),
+		Position = UDim2.new(0, 12, 0, 153),
+		ZIndex = 13,
+	})
+	corner(loadProgress, 2)
+	local loadProgressFill = newFrame(loadProgress, {
+		BG = T.ACCENT,
+		Size = UDim2.new(0, 0, 1, 0),
+		ZIndex = 14,
+	})
+	corner(loadProgressFill, 2)
+	gradient(loadProgressFill, T.ACCENT, T.ACCENT2, 90)
+
+	-- ── STATUS TEXT ──
+	local loadStatusLbl = newLabel(mapCard, {
+		Text = "Sẵn sàng",
+		Color = T.TEXT3, Size = 8,
+		Sz = UDim2.new(1, -24, 0, 14),
+		Position = UDim2.new(0, 12, 0, 161),
+		ZIndex = 13,
+	})
+
+	-- ══════════════════════════════════════════
+	-- MAP CONTROLLER LOGIC
+	-- ══════════════════════════════════════════
+
+	-- Lưu backup map gốc khi khởi động
+	local originalMapBackup = nil
+	local mapLoaded = false
+
+	-- Hàm lấy tất cả instance trong workspace (trừ Player character)
+	local function getWorkspaceObjects()
+		local objects = {}
+		for _, child in ipairs(workspace:GetChildren()) do
+			if child ~= Player.Character then
+				table.insert(objects, child)
+			end
+		end
+		return objects
+	end
+
+	-- Hàm xóa map (giữ lại Player character)
+	local function clearMap()
+		local count = 0
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if obj ~= Player.Character then
+				pcall(function() obj:Destroy() end)
+				count += 1
+			end
+		end
+		return count
+	end
+
+	-- Hàm load map từ Asset ID
+	local function loadMapFromId(assetId)
+		-- Validate asset id
+		local id = tonumber(assetId)
+		if not id then
+			showToast("⚠️ Asset ID không hợp lệ!", "err")
+			return false
+		end
+
+		loadStatusLbl.Text = "🔄 Đang tải map ID: " .. id .. " ..."
+		loadStatusLbl.TextColor3 = T.WARN
+
+		-- Animation progress
+		tween(loadProgressFill, { Size = UDim2.new(0.3, 0, 1, 0) }, TweenInfo.new(0.3))
+
+		task.wait(0.2)
+
+		-- Xóa map hiện tại (giữ character)
+		local removed = clearMap()
+		showToast("🗑️ Đã xóa " .. removed .. " objects", "warn")
+
+		tween(loadProgressFill, { Size = UDim2.new(0.6, 0, 1, 0) }, TweenInfo.new(0.3))
+		task.wait(0.2)
+
+		-- Load map mới
+		local success, result = pcall(function()
+			local mapModel = game:GetService("ReplicatedStorage"):FindFirstChild("MapBackup")
+			if mapModel then
+				-- Nếu đã có backup trong ReplicatedStorage
+				local newMap = mapModel:Clone()
+				newMap.Parent = workspace
+				return newMap
+			else
+				-- Load từ asset
+				local asset = game:GetObjects("rbxassetid://" .. id)
+				if #asset > 0 then
+					local container = Instance.new("Model")
+					container.Name = "LoadedMap_" .. id
+					container.Parent = workspace
+					for _, obj in ipairs(asset) do
+						obj.Parent = container
+					end
+					return container
+				else
+					return nil, "Không tìm thấy asset"
+				end
+			end
+		end)
+
+		tween(loadProgressFill, { Size = UDim2.new(0.9, 0, 1, 0) }, TweenInfo.new(0.3))
+		task.wait(0.2)
+
+		if success and result then
+			tween(loadProgressFill, { Size = UDim2.new(1, 0, 1, 0) }, TweenInfo.new(0.3))
+			loadStatusLbl.Text = "✅ Đã load map: " .. result.Name
+			loadStatusLbl.TextColor3 = T.SUCCESS
+			mapLoaded = true
+
+			-- Cập nhật status
+			mapStatusLbl.Text = "📍 Map: " .. result.Name .. " | " .. #workspace:GetChildren() .. " objects"
+
+			showToast("✅ Map loaded: " .. result.Name, "ok")
+			return true
+		else
+			loadProgressFill.Size = UDim2.new(0, 0, 1, 0)
+			loadStatusLbl.Text = "❌ Lỗi: " .. tostring(result)
+			loadStatusLbl.TextColor3 = T.DANGER
+			showToast("❌ Load map thất bại!", "err")
+			return false
+		end
+	end
+
+	-- Hàm reset map về gốc (reload workspace)
+	local function resetMap()
+		loadStatusLbl.Text = "🔄 Đang reset map..."
+		loadStatusLbl.TextColor3 = T.WARN
+		tween(loadProgressFill, { Size = UDim2.new(0.5, 0, 1, 0) }, TweenInfo.new(0.4))
+		task.wait(0.3)
+
+		-- Xóa map hiện tại (giữ character)
+		clearMap()
+
+		tween(loadProgressFill, { Size = UDim2.new(0.8, 0, 1, 0) }, TweenInfo.new(0.3))
+		task.wait(0.2)
+
+		-- Load lại map từ Workspace gốc (nếu có backup)
+		local success, result = pcall(function()
+			-- Tìm map trong ReplicatedStorage (backup từ lúc bắt đầu)
+			local backup = game:GetService("ReplicatedStorage"):FindFirstChild("OriginalMapBackup")
+			if backup then
+				local newMap = backup:Clone()
+				newMap.Parent = workspace
+				return newMap
+			else
+				-- Fallback: tạo một map trống với một BasePlate
+				local plate = Instance.new("Part")
+				plate.Name = "BasePlate"
+				plate.Size = Vector3.new(100, 2, 100)
+				plate.Position = Vector3.new(0, -1, 0)
+				plate.Anchored = true
+				plate.BrickColor = BrickColor.new("Medium stone grey")
+				plate.Parent = workspace
+
+				local spawn = Instance.new("SpawnLocation")
+				spawn.Name = "SpawnLocation"
+				spawn.Size = Vector3.new(8, 2, 8)
+				spawn.Position = Vector3.new(0, 2, 0)
+				spawn.Parent = workspace
+
+				return plate
+			end
+		end)
+
+		tween(loadProgressFill, { Size = UDim2.new(1, 0, 1, 0) }, TweenInfo.new(0.3))
+		task.wait(0.2)
+
+		if success then
+			loadStatusLbl.Text = "✅ Đã reset map về gốc"
+			loadStatusLbl.TextColor3 = T.SUCCESS
+			mapStatusLbl.Text = "📍 Map: " .. workspace.Name .. " | " .. #workspace:GetChildren() .. " objects"
+			showToast("↺ Đã reset map về gốc", "ok")
+		else
+			loadStatusLbl.Text = "❌ Reset thất bại"
+			loadStatusLbl.TextColor3 = T.DANGER
+			showToast("❌ Reset map thất bại!", "err")
+		end
+	end
+
+	-- ══════════════════════════════════════════
+	-- BACKUP MAP GỐC KHI KHỞI ĐỘNG
+	-- ══════════════════════════════════════════
+	task.spawn(function()
+		task.wait(2)
+		-- Backup workspace vào ReplicatedStorage
+		local backupContainer = Instance.new("Model")
+		backupContainer.Name = "OriginalMapBackup"
+		backupContainer.Parent = game:GetService("ReplicatedStorage")
+
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if obj ~= Player.Character then
+				pcall(function()
+					local clone = obj:Clone()
+					clone.Parent = backupContainer
+				end)
+			end
+		end
+
+		mapStatusLbl.Text = "📍 Map: " .. workspace.Name .. " | " .. #workspace:GetChildren() .. " objects"
+	end)
+
+	-- ══════════════════════════════════════════
+	-- BUTTON EVENTS
+	-- ══════════════════════════════════════════
+
+	-- Load Map
+	loadMapBtn.MouseButton1Click:Connect(function()
+		local id = mapIdBox.Text:match("%d+")
+		if not id then
+			showToast("⚠️ Vui lòng nhập Asset ID hợp lệ!", "warn")
+			return
+		end
+		loadMapFromId(id)
+	end)
+
+	-- Clear Map
+	clearMapBtn.MouseButton1Click:Connect(function()
+		if #workspace:GetChildren() <= 1 then
+			showToast("⚠️ Map đã trống!", "warn")
+			return
+		end
+		local count = clearMap()
+		showToast("💥 Đã xóa " .. count .. " objects khỏi map!", "warn")
+		mapStatusLbl.Text = "📍 Map trống | 0 objects"
+		loadStatusLbl.Text = "💥 Map đã bị xóa"
+		loadStatusLbl.TextColor3 = T.DANGER
+	end)
+
+	-- Reset Map
+	resetMapBtn.MouseButton1Click:Connect(function()
+		resetMap()
+	end)
+
+	-- Enter key để load map
+	mapIdBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			local id = mapIdBox.Text:match("%d+")
+			if id then loadMapFromId(id) end
+		end
+	end)
+
+	-- ══════════════════════════════════════════
+	-- TOOLTIP THÔNG BÁO
+	-- ══════════════════════════════════════════
+	local tooltipRow = newFrame(mapCard, {
+		BG = Color3.fromRGB(16, 16, 36),
+		Size = UDim2.new(1, -24, 0, 20),
+		Position = UDim2.new(0, 12, 0, 180),
+		ZIndex = 13,
+	})
+	corner(tooltipRow, 6)
+	stroke(tooltipRow, T.ACCENT3, 1)
+
+	newLabel(tooltipRow, {
+		Text = "💡 Mẹo: Map ID là số trong URL của model trên Roblox. Load map có thể mất vài giây.",
+		Color = T.TEXT3, Size = 8,
+		Sz = UDim2.new(1, -12, 1, 0),
+		Position = UDim2.new(0, 8, 0, 0),
+		ZIndex = 14,
+	})
+
+	-- Update lại Layout Order cho các section còn lại
+	-- (Các section sau cần tăng order lên 32, 33...)
+	-- Lưu ý: Phần "About & Reset" đang ở order 30, cần đẩy lên 32
+
 	-- ════════════════════════════════
 	-- SECTION 6: ABOUT / RESET
 	-- ════════════════════════════════
@@ -3853,9 +4249,9 @@ do
 			Lighting.Brightness=2; showToast("Night Vision OFF","warn")
 		end
 	end, 35)
-	
-	
-	
+
+
+
 	-- ════════════════════════════════════════
 	-- RESET BUTTON
 	-- ════════════════════════════════════════
@@ -7876,6 +8272,1545 @@ end
 CloseBtn.MouseButton1Click:Connect(closeMenu)
 
 -- ══════════════════════════════════════════
+-- ★ PAGE: SCRIPTS  (Quick Script Runner + Library)
+-- ══════════════════════════════════════════
+local scriptsPage, _ = makePage("Scripts")
+
+do
+	-- ════════════════════════════════════════
+	-- Script Library Storage
+	-- ════════════════════════════════════════
+	local SCRIPT_LIBRARY_KEY = "_NovaScriptLib"
+	local scriptLibrary = _G[SCRIPT_LIBRARY_KEY] or {}
+
+	-- Hàm lưu library
+	local function saveLibrary()
+		_G[SCRIPT_LIBRARY_KEY] = scriptLibrary
+	end
+
+	-- ── DANH SÁCH SCRIPT MẪU ──
+	local PRESET_SCRIPTS = {
+		{
+			name = "Fly",
+			desc = "Bay tự do với WASD + Space",
+			code = [[
+-- Nova Fly Script
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local root = char:WaitForChild("HumanoidRootPart")
+
+local flySpeed = 50
+local flying = false
+local conn = nil
+
+local function toggleFly()
+    flying = not flying
+    if flying then
+        local bg = Instance.new("BodyGyro", root)
+        bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        bg.D = 100
+        bg.P = 10000
+        
+        local bv = Instance.new("BodyVelocity", root)
+        bv.MaxForce = Vector3.new(9e9,9e9,9e9)
+        bv.Velocity = Vector3.zero
+        
+        conn = game:GetService("RunService").RenderStepped:Connect(function()
+            if not flying then return end
+            local cam = workspace.CurrentCamera
+            local dir = Vector3.zero
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+            bv.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.zero
+            bg.CFrame = cam.CFrame
+        end)
+        local h = char:FindFirstChildOfClass("Humanoid")
+        if h then h.PlatformStand = true end
+        print("Fly ON")
+    else
+        if conn then conn:Disconnect(); conn = nil end
+        if root then
+            local bg2 = root:FindFirstChild("BodyGyro")
+            local bv2 = root:FindFirstChild("BodyVelocity")
+            if bg2 then bg2:Destroy() end
+            if bv2 then bv2:Destroy() end
+        end
+        local h = char:FindFirstChildOfClass("Humanoid")
+        if h then h.PlatformStand = false end
+        print("Fly OFF")
+    end
+end
+
+toggleFly()
+]]
+		},
+		{
+			name = "NoClip",
+			desc = "Đi xuyên tường",
+			code = [[
+-- Nova NoClip Script
+local player = game.Players.LocalPlayer
+local running = false
+local conn = nil
+
+local function toggleNoClip()
+    running = not running
+    if running then
+        conn = game:GetService("RunService").Stepped:Connect(function()
+            if player.Character then
+                for _, p in ipairs(player.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end
+        end)
+        print("NoClip ON")
+    else
+        if conn then conn:Disconnect(); conn = nil end
+        if player.Character then
+            for _, p in ipairs(player.Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = true end
+            end
+        end
+        print("NoClip OFF")
+    end
+end
+
+toggleNoClip()
+]]
+		},
+		{
+			name = "Speed Boost",
+			desc = "Tăng tốc gấp 3",
+			code = [[
+-- Nova Speed Boost Script
+local player = game.Players.LocalPlayer
+local char = player.Character
+if not char then print("Character not found"); return end
+local hum = char:FindFirstChildOfClass("Humanoid")
+if not hum then print("Humanoid not found"); return end
+local current = hum.WalkSpeed
+hum.WalkSpeed = current > 32 and 16 or current * 3
+print("Speed: " .. hum.WalkSpeed)
+]]
+		},
+		{
+			name = "Auto Heal",
+			desc = "Tự hồi máu 5HP/s",
+			code = [[
+-- Nova Auto Heal Script
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local running = false
+local conn = nil
+
+local function toggleHeal()
+    running = not running
+    if running then
+        conn = game:GetService("RunService").Heartbeat:Connect(function(dt)
+            if hum and hum.Health < hum.MaxHealth then
+                hum.Health = math.min(hum.Health + dt * 5, hum.MaxHealth)
+            end
+        end)
+        print("Auto Heal ON")
+    else
+        if conn then conn:Disconnect(); conn = nil end
+        print("Auto Heal OFF")
+    end
+end
+
+toggleHeal()
+]]
+		},
+		{
+			name = "Anti-AFK",
+			desc = "Tránh bị kick AFK",
+			code = [[
+-- Nova Anti-AFK Script
+local running = false
+
+local function toggleAFK()
+    running = not running
+    if running then
+        game:GetService("RunService").Heartbeat:Connect(function()
+            if running then
+                pcall(function()
+                    local vu = game:GetService("VirtualUser")
+                    vu:CaptureController()
+                    vu:ClickButton2(Vector2.new())
+                end)
+            end
+        end)
+        print("Anti-AFK ON")
+    else
+        print("Anti-AFK OFF")
+    end
+end
+
+toggleAFK()
+]]
+		},
+	}
+
+	-- ════════════════════════════════════════
+	-- UI: Header + Quick Run
+	-- ════════════════════════════════════════
+
+	-- Quick Run Card
+	local quickCard = makeCard(scriptsPage, 90, 1)
+	gradient(quickCard, Color3.fromRGB(20, 20, 44), Color3.fromRGB(14, 14, 28), 135)
+
+	newLabel(quickCard, {
+		Text = "⚡ Quick Script Runner",
+		Color = T.WHITE, Size = 14, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, -20, 0, 22),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+	newLabel(quickCard, {
+		Text = "Nhập script hoặc chọn từ thư viện bên dưới",
+		Color = T.TEXT3, Size = 10,
+		Sz = UDim2.new(1, -20, 0, 16),
+		Position = UDim2.new(0, 12, 0, 28), ZIndex = 13,
+	})
+
+	-- Editor area
+	local codeEditor = Instance.new("TextBox", quickCard)
+	codeEditor.Size = UDim2.new(1, -100, 0, 36)
+	codeEditor.Position = UDim2.new(0, 10, 0.58, -14)
+	codeEditor.BackgroundColor3 = Color3.fromRGB(6, 6, 12)
+	codeEditor.BorderSizePixel = 0
+	codeEditor.TextColor3 = T.SUCCESS
+	codeEditor.PlaceholderText = "-- Nhập Lua script của bạn..."
+	codeEditor.PlaceholderColor3 = T.TEXT3
+	codeEditor.Text = ""
+	codeEditor.TextSize = 10
+	codeEditor.Font = Enum.Font.Code
+	codeEditor.ClearTextOnFocus = false
+	codeEditor.MultiLine = true
+	codeEditor.ZIndex = 13
+	corner(codeEditor, 8)
+	stroke(codeEditor, T.BORDER, 1)
+	local cePad = Instance.new("UIPadding", codeEditor)
+	cePad.PaddingLeft = UDim.new(0, 8)
+	cePad.PaddingTop = UDim.new(0, 4)
+
+	-- Run button
+	local runBtn = Instance.new("TextButton", quickCard)
+	runBtn.Size = UDim2.new(0, 80, 0, 36)
+	runBtn.Position = UDim2.new(1, -90, 0.58, -14)
+	runBtn.Text = "▶  Run"
+	runBtn.TextSize = 12
+	runBtn.Font = Enum.Font.GothamBold
+	runBtn.TextColor3 = T.WHITE
+	runBtn.BackgroundColor3 = T.SUCCESS
+	runBtn.BorderSizePixel = 0
+	runBtn.ZIndex = 13
+	corner(runBtn, 8)
+
+	runBtn.MouseEnter:Connect(function() tween(runBtn, {BackgroundColor3=Color3.fromRGB(50, 220, 100)}) end)
+	runBtn.MouseLeave:Connect(function() tween(runBtn, {BackgroundColor3=T.SUCCESS}) end)
+
+	-- Save to Library button
+	local saveLibBtn = Instance.new("TextButton", quickCard)
+	saveLibBtn.Size = UDim2.new(0, 60, 0, 22)
+	saveLibBtn.Position = UDim2.new(1, -58, 0, 4)
+	saveLibBtn.Text = "💾 Save"
+	saveLibBtn.TextSize = 9
+	saveLibBtn.Font = Enum.Font.GothamBold
+	saveLibBtn.TextColor3 = T.ACCENT
+	saveLibBtn.BackgroundColor3 = T.SURFACE2
+	saveLibBtn.BorderSizePixel = 0
+	saveLibBtn.ZIndex = 13
+	corner(saveLibBtn, 6)
+	stroke(saveLibBtn, T.ACCENT, 1)
+
+	-- Script name input
+	local scriptNameBox = Instance.new("TextBox", quickCard)
+	scriptNameBox.Size = UDim2.new(0, 120, 0, 22)
+	scriptNameBox.Position = UDim2.new(0, 10, 0, 4)
+	scriptNameBox.BackgroundColor3 = T.SURFACE2
+	scriptNameBox.BorderSizePixel = 0
+	scriptNameBox.TextColor3 = T.TEXT
+	scriptNameBox.PlaceholderText = "Tên script..."
+	scriptNameBox.PlaceholderColor3 = T.TEXT3
+	scriptNameBox.Text = ""
+	scriptNameBox.TextSize = 9
+	scriptNameBox.Font = Enum.Font.Gotham
+	scriptNameBox.ClearTextOnFocus = false
+	scriptNameBox.ZIndex = 13
+	corner(scriptNameBox, 6)
+	stroke(scriptNameBox, T.BORDER, 1)
+	local snPad = Instance.new("UIPadding", scriptNameBox)
+	snPad.PaddingLeft = UDim.new(0, 6)
+
+	-- ── Run function ──
+	local function runScript(code)
+		if code == "" then
+			showToast("Script trống!", "warn")
+			return
+		end
+		local fn, err = loadstring(code)
+		if fn then
+			local ok, result = pcall(fn)
+			if not ok then
+				showToast("Lỗi: " .. tostring(result):sub(1, 40), "err")
+			else
+				showToast("✓ Script đã chạy", "ok")
+			end
+		else
+			showToast("Lỗi syntax: " .. tostring(err):sub(1, 40), "err")
+		end
+	end
+
+	runBtn.MouseButton1Click:Connect(function()
+		runScript(codeEditor.Text)
+	end)
+
+	saveLibBtn.MouseButton1Click:Connect(function()
+		local name = scriptNameBox.Text
+		local code = codeEditor.Text
+		if name == "" then showToast("Nhập tên script!", "warn"); return end
+		if code == "" then showToast("Script trống!", "warn"); return end
+		scriptLibrary[name] = code
+		saveLibrary()
+		showToast("✓ Đã lưu: " .. name, "ok")
+		rebuildLibrary()
+	end)
+
+	-- ════════════════════════════════════════
+	-- SECTION: SCRIPT LIBRARY
+	-- ════════════════════════════════════════
+	makeSectionLabel(scriptsPage, "📚 Script Library", 2)
+
+	-- Library toolbar
+	local libToolbar = newFrame(scriptsPage, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, 0, 0, 28), ZIndex = 12,
+	})
+	libToolbar.LayoutOrder = 3
+
+	local libToolLayout = Instance.new("UIListLayout", libToolbar)
+	libToolLayout.FillDirection = Enum.FillDirection.Horizontal
+	libToolLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	libToolLayout.Padding = UDim.new(0, 6)
+	local ltPad = Instance.new("UIPadding", libToolbar)
+	ltPad.PaddingLeft = UDim.new(0, 8)
+	ltPad.PaddingTop = UDim.new(0, 2)
+
+	-- Preset button
+	local presetBtn = Instance.new("TextButton", libToolbar)
+	presetBtn.Size = UDim2.new(0, 70, 0, 22)
+	presetBtn.Text = "📦 Presets"
+	presetBtn.TextSize = 9
+	presetBtn.Font = Enum.Font.GothamBold
+	presetBtn.TextColor3 = T.ACCENT
+	presetBtn.BackgroundColor3 = T.SURFACE2
+	presetBtn.BorderSizePixel = 0
+	presetBtn.ZIndex = 13
+	corner(presetBtn, 6)
+	stroke(presetBtn, T.ACCENT, 1)
+
+	-- Export button
+	local exportLibBtn = Instance.new("TextButton", libToolbar)
+	exportLibBtn.Size = UDim2.new(0, 70, 0, 22)
+	exportLibBtn.Text = "📋 Export All"
+	exportLibBtn.TextSize = 9
+	exportLibBtn.Font = Enum.Font.GothamBold
+	exportLibBtn.TextColor3 = T.TEXT3
+	exportLibBtn.BackgroundColor3 = T.SURFACE2
+	exportLibBtn.BorderSizePixel = 0
+	exportLibBtn.ZIndex = 13
+	corner(exportLibBtn, 6)
+	stroke(exportLibBtn, T.BORDER, 1)
+
+	-- Clear button
+	local clearLibBtn = Instance.new("TextButton", libToolbar)
+	clearLibBtn.Size = UDim2.new(0, 60, 0, 22)
+	clearLibBtn.Text = "🗑 Clear"
+	clearLibBtn.TextSize = 9
+	clearLibBtn.Font = Enum.Font.GothamBold
+	clearLibBtn.TextColor3 = T.DANGER
+	clearLibBtn.BackgroundColor3 = T.SURFACE2
+	clearLibBtn.BorderSizePixel = 0
+	clearLibBtn.ZIndex = 13
+	corner(clearLibBtn, 6)
+	stroke(clearLibBtn, T.DANGER, 1)
+
+	-- Library list container
+	local libContainer = newFrame(scriptsPage, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, 0, 0, 10), ZIndex = 12,
+	})
+	libContainer.LayoutOrder = 4
+	libContainer.AutomaticSize = Enum.AutomaticSize.Y
+	corner(libContainer, 10)
+	stroke(libContainer, T.BORDER, 1)
+
+	local libList = Instance.new("UIListLayout", libContainer)
+	libList.SortOrder = Enum.SortOrder.LayoutOrder
+	libList.Padding = UDim.new(0, 1)
+	local libPad = Instance.new("UIPadding", libContainer)
+	libPad.PaddingTop = UDim.new(0, 4)
+	libPad.PaddingBottom = UDim.new(0, 4)
+
+	local emptyLibLbl = newLabel(libContainer, {
+		Text = "📭 Chưa có script nào. Nhấn 💾 Save để lưu!",
+		Color = T.TEXT3, Size = 10,
+		Sz = UDim2.new(1, 0, 0, 32), ZIndex = 13,
+		AlignX = Enum.TextXAlignment.Center,
+	})
+	emptyLibLbl.LayoutOrder = 9999
+
+	-- Hàm rebuild library
+	local libRows = {}
+
+	function rebuildLibrary()
+		for _, r in ipairs(libRows) do
+			if r and r.Parent then r:Destroy() end
+		end
+		libRows = {}
+
+		local names = {}
+		for name, _ in pairs(scriptLibrary) do
+			table.insert(names, name)
+		end
+		table.sort(names)
+
+		if #names == 0 then
+			emptyLibLbl.Visible = true
+			return
+		end
+		emptyLibLbl.Visible = false
+
+		for i, name in ipairs(names) do
+			local code = scriptLibrary[name]
+			local row = newFrame(libContainer, {
+				BG = i % 2 == 0 and T.SURFACE2 or T.SURFACE,
+				BT = 0.2,
+				Size = UDim2.new(1, 0, 0, 32), ZIndex = 13,
+			})
+			row.LayoutOrder = i
+			corner(row, 6)
+
+			-- Name
+			newLabel(row, {
+				Text = name,
+				Color = T.TEXT, Size = 10, Font = Enum.Font.GothamBold,
+				Sz = UDim2.new(0.4, -10, 1, 0),
+				Position = UDim2.new(0, 10, 0, 0), ZIndex = 14, Truncate = true,
+			})
+
+			-- Size info
+			local sizeKB = math.floor(#code / 1024 * 10) / 10
+			newLabel(row, {
+				Text = sizeKB < 1 and "~" .. #code .. "B" or sizeKB .. "KB",
+				Color = T.TEXT3, Size = 8,
+				Sz = UDim2.new(0.2, 0, 1, 0),
+				Position = UDim2.new(0.4, 0, 0, 0), ZIndex = 14,
+			})
+
+			-- Run button
+			local runLibBtn = Instance.new("TextButton", row)
+			runLibBtn.Size = UDim2.new(0, 40, 0, 22)
+			runLibBtn.AnchorPoint = Vector2.new(1, 0.5)
+			runLibBtn.Position = UDim2.new(0.8, -4, 0.5, 0)
+			runLibBtn.Text = "▶ Run"
+			runLibBtn.TextSize = 8
+			runLibBtn.Font = Enum.Font.GothamBold
+			runLibBtn.TextColor3 = T.SUCCESS
+			runLibBtn.BackgroundColor3 = T.SURFACE2
+			runLibBtn.BorderSizePixel = 0
+			runLibBtn.ZIndex = 14
+			corner(runLibBtn, 5)
+			stroke(runLibBtn, T.SUCCESS, 1)
+
+			runLibBtn.MouseButton1Click:Connect(function()
+				runScript(code)
+				-- Ghi đè vào editor để xem
+				codeEditor.Text = code
+				scriptNameBox.Text = name
+			end)
+
+			-- Delete button
+			local delLibBtn = Instance.new("TextButton", row)
+			delLibBtn.Size = UDim2.new(0, 28, 0, 22)
+			delLibBtn.AnchorPoint = Vector2.new(1, 0.5)
+			delLibBtn.Position = UDim2.new(0.98, -2, 0.5, 0)
+			delLibBtn.Text = "✕"
+			delLibBtn.TextSize = 10
+			delLibBtn.Font = Enum.Font.GothamBold
+			delLibBtn.TextColor3 = T.DANGER
+			delLibBtn.BackgroundColor3 = T.SURFACE2
+			delLibBtn.BorderSizePixel = 0
+			delLibBtn.ZIndex = 14
+			corner(delLibBtn, 5)
+			stroke(delLibBtn, T.DANGER, 1)
+
+			delLibBtn.MouseButton1Click:Connect(function()
+				scriptLibrary[name] = nil
+				saveLibrary()
+				showToast("Đã xóa: " .. name, "warn")
+				rebuildLibrary()
+			end)
+
+			table.insert(libRows, row)
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- BUTTON HANDLERS
+	-- ════════════════════════════════════════
+
+	-- Preset button
+	local presetMenuOpen = false
+	presetBtn.MouseButton1Click:Connect(function()
+		presetMenuOpen = not presetMenuOpen
+		if presetMenuOpen then
+			-- Show presets
+			for i, preset in ipairs(PRESET_SCRIPTS) do
+				local pBtn = Instance.new("TextButton", libToolbar)
+				pBtn.Size = UDim2.new(0, 0, 0, 22)
+				pBtn.AutomaticSize = Enum.AutomaticSize.X
+				pBtn.Text = preset.name
+				pBtn.TextSize = 9
+				pBtn.Font = Enum.Font.GothamBold
+				pBtn.TextColor3 = T.TEXT3
+				pBtn.BackgroundColor3 = T.SURFACE2
+				pBtn.BorderSizePixel = 0
+				pBtn.ZIndex = 14
+				pBtn.LayoutOrder = 100 + i
+				corner(pBtn, 5)
+				stroke(pBtn, T.BORDER, 1)
+
+				pBtn.MouseButton1Click:Connect(function()
+					codeEditor.Text = preset.code
+					scriptNameBox.Text = preset.name
+					showToast("Loaded: " .. preset.name, "ok")
+					presetMenuOpen = false
+					rebuildLibrary()
+				end)
+
+				-- Tự động xóa sau khi click
+				local function cleanup()
+					for _, c in ipairs(libToolbar:GetChildren()) do
+						if c:IsA("TextButton") and c ~= presetBtn and c ~= exportLibBtn and c ~= clearLibBtn then
+							c:Destroy()
+						end
+					end
+				end
+				-- Xóa khi click vào bất kỳ đâu khác
+				pBtn.MouseLeave:Connect(function()
+					task.wait(2)
+					if presetMenuOpen then
+						presetMenuOpen = false
+						cleanup()
+					end
+				end)
+			end
+		else
+			-- Remove preset buttons
+			for _, c in ipairs(libToolbar:GetChildren()) do
+				if c:IsA("TextButton") and c ~= presetBtn and c ~= exportLibBtn and c ~= clearLibBtn then
+					c:Destroy()
+				end
+			end
+		end
+	end)
+
+	-- Export all
+	exportLibBtn.MouseButton1Click:Connect(function()
+		local names = {}
+		for name, _ in pairs(scriptLibrary) do
+			table.insert(names, name)
+		end
+		if #names == 0 then showToast("Không có script nào!", "warn"); return end
+		table.sort(names)
+		local output = "-- Nova Script Library Export\n-- " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n\n"
+		for _, name in ipairs(names) do
+			output = output .. "-- " .. name .. "\n" .. scriptLibrary[name] .. "\n\n"
+		end
+		copyText(output)
+		showToast("✓ Đã copy " .. #names .. " scripts", "ok")
+	end)
+
+	-- Clear all
+	clearLibBtn.MouseButton1Click:Connect(function()
+		scriptLibrary = {}
+		saveLibrary()
+		showToast("Đã xóa toàn bộ library", "warn")
+		rebuildLibrary()
+	end)
+
+	-- ════════════════════════════════════════
+	-- KEYBIND: Ctrl+Enter để chạy script
+	-- ════════════════════════════════════════
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter then
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+				if pages["Scripts"] and pages["Scripts"].Visible then
+					runScript(codeEditor.Text)
+				end
+			end
+		end
+	end)
+
+	-- ════════════════════════════════════════
+	-- INIT
+	-- ════════════════════════════════════════
+	local scriptsInited = false
+	local function initScripts()
+		if scriptsInited then return end
+		scriptsInited = true
+		rebuildLibrary()
+	end
+
+	pageCallbacks = pageCallbacks or {}
+	pageCallbacks["Scripts"] = initScripts
+end
+
+-- ══════════════════════════════════════════
+-- ★ PAGE: COMBAT  —  PRO AIMBOT SYSTEM v2 (FULL)
+-- ══════════════════════════════════════════
+-- Thêm vào navDefs:
+-- { name="Combat",   icon="⚔",  order=13, color=T.DANGER, divAfter=false },
+
+local combatPage, _ = makePage("Combat")
+
+do
+	-- ════════════════════════════════════════
+	-- STATE (NÂNG CẤP)
+	-- ════════════════════════════════════════
+	local combatState = {
+		-- Main
+		aimbotEnabled   = false,
+		silentAim       = false,
+		triggerBot      = false,
+		showESP         = false,
+
+		-- Aimbot Settings
+		fov             = 120,
+		smoothness      = 5,
+		targetTeam      = "enemy",
+		aimPart         = "Head",
+		triggerDelay    = 0.15,
+		visibleCheck    = true,
+		wallbang        = false,
+
+		-- NEW: NÂNG CẤP
+		showFOVCircle   = true,
+		targetPriority  = "closest",
+		prediction      = true,
+		predictionAmount = 0.3,
+		rcsEnabled      = false,
+		rcsAmount       = 0.5,
+		showSkeleton    = false,
+		showDistance    = true,
+		espBoxColor     = T.DANGER,
+		espHealthColor  = true,
+		aimbotKey       = "MouseButton2",
+		holdAim         = false,
+		drawLineToTarget = false,
+
+		-- Chế độ bắn
+		shootMode       = "single",
+		burstCount      = 3,
+		burstDelay      = 0.1,
+	}
+
+	local aimbotConn = nil
+	local triggerConn = nil
+	local espConn = nil
+	local fovCircle = nil
+	local currentTarget = nil
+	local espObjects = {}
+	local burstCount = 0
+	local recoilOffset = Vector2.new(0, 0)
+
+	-- ════════════════════════════════════════
+	-- HELPERS
+	-- ════════════════════════════════════════
+
+	local function isAlive(plr)
+		local char = plr.Character
+		if not char then return false end
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		return hum and hum.Health > 0
+	end
+
+	local function getAimPart(plr)
+		local char = plr.Character
+		if not char then return nil end
+
+		local parts = {
+			Head = "Head",
+			Chest = "UpperTorso",
+			Body = "HumanoidRootPart",
+			RightArm = "RightArm",
+			LeftArm = "LeftArm",
+			RightLeg = "RightLeg",
+			LeftLeg = "LeftLeg",
+		}
+
+		local targetPart = parts[combatState.aimPart] or "Head"
+		return char:FindFirstChild(targetPart)
+	end
+
+	local function getVelocity(plr)
+		local char = plr.Character
+		if not char then return Vector3.new() end
+		local root = char:FindFirstChild("HumanoidRootPart")
+		if root then
+			return root.AssemblyLinearVelocity
+		end
+		return Vector3.new()
+	end
+
+	local function getHealth(plr)
+		local char = plr.Character
+		if not char then return 0 end
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		return hum and hum.Health or 0
+	end
+
+	local function getMaxHealth(plr)
+		local char = plr.Character
+		if not char then return 100 end
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		return hum and hum.MaxHealth or 100
+	end
+
+	local function isVisible(part)
+		if not combatState.visibleCheck then return true end
+		local cam = workspace.CurrentCamera
+		if not cam then return true end
+
+		local origin = cam.CFrame.Position
+		local direction = (part.Position - origin).Unit * 500
+		local ray = Ray.new(origin, direction)
+
+		local hit = workspace:FindPartOnRay(ray, Player.Character)
+		if hit then
+			local parent = hit.Parent
+			if parent == Player.Character then return true end
+			if parent and (parent:IsA("Model") or parent:IsA("BasePart")) then
+				local hum = parent:FindFirstChildOfClass("Humanoid")
+				if hum then return true end
+			end
+			return false
+		end
+		return true
+	end
+
+	-- ════════════════════════════════════════
+	-- TARGET PRIORITY
+	-- ════════════════════════════════════════
+
+	local function getTargetPriority(plr)
+		local char = plr.Character
+		if not char then return 0 end
+
+		local cam = workspace.CurrentCamera
+		if not cam then return 0 end
+
+		local part = getAimPart(plr)
+		if not part then return 0 end
+
+		local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+		if not onScreen then return 0 end
+
+		local center = cam.ViewportSize / 2
+		local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+		local hp = getHealth(plr)
+		local maxHp = getMaxHealth(plr)
+		local hpRatio = hp / maxHp
+
+		if combatState.targetPriority == "closest" then
+			return -dist
+		elseif combatState.targetPriority == "lowest_hp" then
+			return (1 - hpRatio) * 100
+		elseif combatState.targetPriority == "farthest" then
+			return dist
+		end
+		return -dist
+	end
+
+	local function getBestTarget()
+		local cam = workspace.CurrentCamera
+		if not cam then return nil end
+
+		local best = nil
+		local bestPriority = -math.huge
+
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= Player and isAlive(plr) then
+				if combatState.targetTeam == "enemy" and plr.Team and Player.Team and plr.Team == Player.Team then
+					-- Skip same team
+				else
+					local part = getAimPart(plr)
+					if part then
+						local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+						if onScreen then
+							local center = cam.ViewportSize / 2
+							local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+
+							if dist < combatState.fov then
+								local visible = isVisible(part)
+								if visible or combatState.wallbang then
+									local priority = getTargetPriority(plr)
+									if priority > bestPriority then
+										bestPriority = priority
+										best = plr
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	-- ════════════════════════════════════════
+	-- AIMBOT CORE
+	-- ════════════════════════════════════════
+
+	local function aimAt(target)
+		if not target then return end
+		local part = getAimPart(target)
+		if not part then return end
+
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+
+		local targetPos = part.Position
+
+		-- Prediction
+		if combatState.prediction then
+			local vel = getVelocity(target)
+			if vel.Magnitude > 1 then
+				local bulletSpeed = 2000
+				local distance = (targetPos - cam.CFrame.Position).Magnitude
+				local travelTime = distance / bulletSpeed
+				targetPos = targetPos + vel * travelTime * combatState.predictionAmount
+			end
+		end
+
+		-- RCS
+		if combatState.rcsEnabled then
+			local rcsAmount = combatState.rcsAmount * 0.5
+			targetPos = targetPos + Vector3.new(
+				-recoilOffset.X * rcsAmount,
+				-recoilOffset.Y * rcsAmount,
+				0
+			)
+		end
+
+		local currentDir = cam.CFrame.LookVector
+		local targetDir = (targetPos - cam.CFrame.Position).Unit
+
+		if combatState.smoothness > 1 then
+			local smooth = 1 - (combatState.smoothness / 20)
+			local newDir = currentDir:Lerp(targetDir, smooth)
+			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position + newDir * 100)
+		else
+			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- FOV CIRCLE
+	-- ════════════════════════════════════════
+
+	local fovGui = Instance.new("ScreenGui")
+	fovGui.Name = "NovaFOV"
+	fovGui.ResetOnSpawn = false
+	fovGui.IgnoreGuiInset = true
+	fovGui.Parent = PlayerGui
+
+	local function updateFOVCircle()
+		if not combatState.showFOVCircle or not combatState.aimbotEnabled then
+			if fovCircle then
+				fovCircle.Visible = false
+			end
+			return
+		end
+
+		if not fovCircle then
+			fovCircle = Instance.new("Frame", fovGui)
+			fovCircle.Size = UDim2.new(0, combatState.fov * 2, 0, combatState.fov * 2)
+			fovCircle.Position = UDim2.new(0.5, -combatState.fov, 0.5, -combatState.fov)
+			fovCircle.BackgroundColor3 = T.ACCENT
+			fovCircle.BackgroundTransparency = 0.85
+			fovCircle.BorderSizePixel = 1
+			fovCircle.BorderColor3 = T.ACCENT
+			fovCircle.ZIndex = 100
+			corner(fovCircle, combatState.fov)
+		else
+			fovCircle.Size = UDim2.new(0, combatState.fov * 2, 0, combatState.fov * 2)
+			fovCircle.Position = UDim2.new(0.5, -combatState.fov, 0.5, -combatState.fov)
+			corner(fovCircle, combatState.fov)
+			fovCircle.Visible = true
+
+			local dot = fovCircle:FindFirstChild("Dot") or Instance.new("Frame", fovCircle)
+			dot.Name = "Dot"
+			dot.Size = UDim2.new(0, 3, 0, 3)
+			dot.Position = UDim2.new(0.5, -1.5, 0.5, -1.5)
+			dot.BackgroundColor3 = T.ACCENT
+			dot.BorderSizePixel = 0
+			dot.ZIndex = 101
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- ESP SYSTEM
+	-- ════════════════════════════════════════
+
+	local espGui = Instance.new("ScreenGui")
+	espGui.Name = "NovaESP"
+	espGui.ResetOnSpawn = false
+	espGui.IgnoreGuiInset = true
+	espGui.Parent = PlayerGui
+
+	local function clearESP()
+		for _, obj in ipairs(espObjects) do
+			pcall(function() obj:Destroy() end)
+		end
+		espObjects = {}
+	end
+
+	local function drawSkeleton(char, espGui, pos)
+		if not combatState.showSkeleton then return end
+
+		local joints = {
+			{"Head", "UpperTorso"},
+			{"UpperTorso", "LowerTorso"},
+			{"LeftArm", "LeftHand"},
+			{"RightArm", "RightHand"},
+			{"LeftLeg", "LeftFoot"},
+			{"RightLeg", "RightFoot"},
+		}
+
+		for _, joint in ipairs(joints) do
+			local part1 = char:FindFirstChild(joint[1])
+			local part2 = char:FindFirstChild(joint[2])
+			if part1 and part2 then
+				local cam = workspace.CurrentCamera
+				local p1, on1 = cam:WorldToViewportPoint(part1.Position)
+				local p2, on2 = cam:WorldToViewportPoint(part2.Position)
+				if on1 and on2 then
+					local line = Instance.new("Frame", espGui)
+					local midX = (p1.X + p2.X) / 2
+					local midY = (p1.Y + p2.Y) / 2
+					local dx = p2.X - p1.X
+					local dy = p2.Y - p1.Y
+					local length = math.sqrt(dx*dx + dy*dy)
+					local angle = math.atan2(dy, dx)
+
+					line.Size = UDim2.new(0, length, 0, 1)
+					line.Position = UDim2.new(0, midX - length/2, 0, midY - 0.5)
+					line.Rotation = math.deg(angle)
+					line.BackgroundColor3 = T.ACCENT
+					line.BackgroundTransparency = 0.3
+					line.BorderSizePixel = 0
+					line.ZIndex = 49
+					table.insert(espObjects, line)
+				end
+			end
+		end
+	end
+
+	local function updateESP()
+		if not combatState.showESP then
+			clearESP()
+			return
+		end
+
+		clearESP()
+
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= Player and isAlive(plr) then
+				local char = plr.Character
+				if not char then continue end
+				local root = char:FindFirstChild("HumanoidRootPart")
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if not root or not hum then continue end
+
+				local pos, onScreen = cam:WorldToViewportPoint(root.Position)
+				if not onScreen then continue end
+
+				-- Box ESP
+				local isEnemy = plr.Team and Player.Team and plr.Team ~= Player.Team
+				local boxColor = isEnemy and T.DANGER or T.SUCCESS
+
+				local box = Instance.new("Frame", espGui)
+				box.Size = UDim2.new(0, 40, 0, 80)
+				box.Position = UDim2.new(0, pos.X - 20, 0, pos.Y - 80)
+				box.BackgroundColor3 = boxColor
+				box.BackgroundTransparency = 0.2
+				box.BorderSizePixel = 1
+				box.BorderColor3 = boxColor
+				box.ZIndex = 50
+				table.insert(espObjects, box)
+
+				-- Health Bar
+				local hpRatio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+				local healthColor = hpRatio > 0.6 and T.SUCCESS or hpRatio > 0.3 and T.WARN or T.DANGER
+
+				if combatState.showHealthBar then
+					local healthBg = Instance.new("Frame", espGui)
+					healthBg.Size = UDim2.new(0, 4, 0, 80)
+					healthBg.Position = UDim2.new(0, pos.X - 24, 0, pos.Y - 80)
+					healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+					healthBg.BorderSizePixel = 0
+					healthBg.ZIndex = 51
+					table.insert(espObjects, healthBg)
+
+					local healthFill = Instance.new("Frame", healthBg)
+					healthFill.Size = UDim2.new(0, 4, 0, 80 * hpRatio)
+					healthFill.Position = UDim2.new(0, 0, 0, 80 * (1 - hpRatio))
+					healthFill.BackgroundColor3 = healthColor
+					healthFill.BorderSizePixel = 0
+					healthFill.ZIndex = 52
+					table.insert(espObjects, healthFill)
+				end
+
+				-- Name Tag
+				if combatState.showNameTag then
+					local nameTag = Instance.new("TextLabel", espGui)
+					nameTag.Size = UDim2.new(0, 80, 0, 16)
+					nameTag.Position = UDim2.new(0, pos.X - 40, 0, pos.Y - 82)
+					nameTag.Text = plr.DisplayName
+					nameTag.TextColor3 = T.WHITE
+					nameTag.TextSize = 9
+					nameTag.Font = Enum.Font.GothamBold
+					nameTag.BackgroundTransparency = 1
+					nameTag.TextXAlignment = Enum.TextXAlignment.Center
+					nameTag.ZIndex = 50
+					table.insert(espObjects, nameTag)
+				end
+
+				-- Distance
+				if combatState.showDistance then
+					local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+					local dist = 0
+					if myRoot then
+						dist = math.floor((root.Position - myRoot.Position).Magnitude)
+					end
+
+					local distText = Instance.new("TextLabel", espGui)
+					distText.Size = UDim2.new(0, 40, 0, 14)
+					distText.Position = UDim2.new(0, pos.X - 20, 0, pos.Y + 2)
+					distText.Text = dist .. "m"
+					distText.TextColor3 = T.TEXT3
+					distText.TextSize = 7
+					distText.Font = Enum.Font.Gotham
+					distText.BackgroundTransparency = 1
+					distText.TextXAlignment = Enum.TextXAlignment.Center
+					distText.ZIndex = 50
+					table.insert(espObjects, distText)
+				end
+
+				-- Skeleton
+				drawSkeleton(char, espGui, pos)
+			end
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- TRIGGER BOT
+	-- ════════════════════════════════════════
+
+	local function triggerBotLoop()
+		if not combatState.triggerBot then return end
+
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+
+		local mouse = UserInputService:GetMouseLocation()
+		local mousePos = Vector2.new(mouse.X, mouse.Y)
+
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= Player and isAlive(plr) then
+				local part = getAimPart(plr)
+				if part then
+					local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+					if onScreen then
+						local screenDist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+						if screenDist < 20 then
+							if combatState.visibleCheck and not isVisible(part) then
+								if not combatState.wallbang then return end
+							end
+
+							-- Shoot Mode
+							if combatState.shootMode == "single" then
+								pcall(function()
+									local mouse = Player:GetMouse()
+									if mouse then
+										mouse.Button1Down:Fire()
+										task.wait(0.05)
+										mouse.Button1Up:Fire()
+									end
+								end)
+							elseif combatState.shootMode == "burst" then
+								if burstCount < combatState.burstCount then
+									pcall(function()
+										local mouse = Player:GetMouse()
+										if mouse then
+											mouse.Button1Down:Fire()
+											task.wait(0.05)
+											mouse.Button1Up:Fire()
+										end
+									end)
+									burstCount += 1
+									task.wait(combatState.burstDelay)
+								end
+							elseif combatState.shootMode == "auto" then
+								pcall(function()
+									local mouse = Player:GetMouse()
+									if mouse then
+										mouse.Button1Down:Fire()
+										task.wait(0.05)
+										mouse.Button1Up:Fire()
+									end
+								end)
+							end
+
+							task.wait(combatState.triggerDelay)
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- TOGGLE FUNCTIONS
+	-- ════════════════════════════════════════
+
+	local function toggleAimbot(on)
+		combatState.aimbotEnabled = on
+		if on then
+			if aimbotConn then aimbotConn:Disconnect() end
+			aimbotConn = RunService.RenderStepped:Connect(function()
+				if combatState.aimbotEnabled then
+					if combatState.holdAim then
+						local key = combatState.aimbotKey
+						local pressed = false
+						if key == "MouseButton2" then
+							pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+						elseif key == "MouseButton1" then
+							pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+						else
+							pressed = UserInputService:IsKeyDown(Enum.KeyCode[key])
+						end
+						if not pressed then
+							currentTarget = nil
+							return
+						end
+					end
+
+					local target = getBestTarget()
+					currentTarget = target
+					if target then
+						aimAt(target)
+					end
+				end
+			end)
+			updateFOVCircle()
+			showToast("Aimbot ON 🎯", "ok")
+		else
+			if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
+			currentTarget = nil
+			if fovCircle then fovCircle.Visible = false end
+			showToast("Aimbot OFF", "warn")
+		end
+	end
+
+	local function toggleTriggerBot(on)
+		combatState.triggerBot = on
+		if on then
+			if triggerConn then triggerConn:Disconnect() end
+			triggerConn = RunService.Heartbeat:Connect(function()
+				triggerBotLoop()
+				if burstCount >= combatState.burstCount then
+					burstCount = 0
+				end
+			end)
+			showToast("Trigger Bot ON 🔫", "ok")
+		else
+			if triggerConn then triggerConn:Disconnect(); triggerConn = nil end
+			showToast("Trigger Bot OFF", "warn")
+		end
+	end
+
+	local function toggleESP(on)
+		combatState.showESP = on
+		if on then
+			if espConn then espConn:Disconnect() end
+			espConn = RunService.RenderStepped:Connect(updateESP)
+			showToast("ESP ON 👁", "ok")
+		else
+			if espConn then espConn:Disconnect(); espConn = nil end
+			clearESP()
+			showToast("ESP OFF", "warn")
+		end
+	end
+
+	-- ════════════════════════════════════════
+	-- UI BUILD
+	-- ════════════════════════════════════════
+
+	-- Banner
+	local banner = newFrame(combatPage, {
+		BG = Color3.fromRGB(40, 10, 10),
+		Size = UDim2.new(1, 0, 0, 44),
+		ZIndex = 12,
+	})
+	banner.LayoutOrder = 1
+	corner(banner, 12)
+	stroke(banner, T.DANGER, 2)
+
+	newLabel(banner, {
+		Text = "⚔  COMBAT SYSTEM PRO  ⚔",
+		Color = T.WHITE, Size = 16, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, 0, 1, 0), ZIndex = 13,
+		AlignX = Enum.TextXAlignment.Center,
+	})
+
+	-- SECTION: MAIN TOGGLES
+	makeSectionLabel(combatPage, "Main", 2)
+
+	makeToggle(combatPage, "🎯 Aimbot (Auto Aim)", false, toggleAimbot, 3)
+	makeToggle(combatPage, "🤫 Silent Aim (Invisible)", false, function(on)
+		combatState.silentAim = on
+		if on and not combatState.aimbotEnabled then
+			showToast("Bật Aimbot trước khi dùng Silent Aim!", "warn")
+		end
+	end, 4)
+	makeToggle(combatPage, "🔫 Trigger Bot (Auto Shoot)", false, toggleTriggerBot, 5)
+	makeToggle(combatPage, "👁 ESP (Wallhack)", false, toggleESP, 6)
+
+	-- SECTION: AIMBOT SETTINGS
+	makeSectionLabel(combatPage, "Aimbot Settings", 7)
+
+	makeSlider(combatPage, "FOV (Field of View)", 10, 360, 120, function(v)
+		combatState.fov = v
+		updateFOVCircle()
+	end, 8)
+
+	makeSlider(combatPage, "Smoothness (1=instant, 10=smooth)", 1, 10, 5, function(v)
+		combatState.smoothness = v
+	end, 9)
+
+	makeSlider(combatPage, "Trigger Delay (seconds)", 0.01, 0.5, 0.15, function(v)
+		combatState.triggerDelay = v
+	end, 10)
+
+	makeToggle(combatPage, "Show FOV Circle 🔵", true, function(on)
+		combatState.showFOVCircle = on
+		updateFOVCircle()
+	end, 11)
+
+	-- Target Priority
+	local priorityCard = makeCard(combatPage, 46, 12)
+	newLabel(priorityCard, {
+		Text = "🎯 Target Priority",
+		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 120, 0, 20),
+		Position = UDim2.new(0, 14, 0, 6), ZIndex = 13,
+	})
+
+	local PRIORITY_OPTIONS = {
+		{ label = "Closest", key = "closest" },
+		{ label = "Lowest HP", key = "lowest_hp" },
+		{ label = "Farthest", key = "farthest" },
+	}
+
+	for i, opt in ipairs(PRIORITY_OPTIONS) do
+		local btn = Instance.new("TextButton", priorityCard)
+		btn.Size = UDim2.new(0, 70, 0, 28)
+		btn.Position = UDim2.new(0, 140 + (i-1)*76, 0.5, -14)
+		btn.Text = opt.label
+		btn.TextSize = 9
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 13
+		corner(btn, 8)
+		stroke(btn, i == 1 and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			combatState.targetPriority = opt.key
+			for j, other in ipairs(PRIORITY_OPTIONS) do
+				local ob = priorityCard:GetChildren()[j+3]
+				if ob and ob:IsA("TextButton") then
+					tween(ob, {
+						BackgroundColor3 = j == i and T.ACCENT or T.SURFACE2,
+						TextColor3 = j == i and T.WHITE or T.TEXT3,
+					})
+					stroke(ob, j == i and T.ACCENT or T.BORDER, 1)
+				end
+			end
+			showToast("Priority: " .. opt.label, "ok")
+		end)
+	end
+
+	-- SECTION: AIM PART
+	makeSectionLabel(combatPage, "Aim Part", 13)
+
+	local partCard = makeCard(combatPage, 46, 14)
+	newLabel(partCard, {
+		Text = "🎯 Aim Target",
+		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 100, 0, 20),
+		Position = UDim2.new(0, 14, 0, 6), ZIndex = 13,
+	})
+
+	local PART_OPTIONS = {
+		{ label = "Head", key = "Head" },
+		{ label = "Chest", key = "Chest" },
+		{ label = "Body", key = "Body" },
+		{ label = "Right Arm", key = "RightArm" },
+		{ label = "Left Arm", key = "LeftArm" },
+	}
+
+	for i, opt in ipairs(PART_OPTIONS) do
+		local btn = Instance.new("TextButton", partCard)
+		btn.Size = UDim2.new(0, 60, 0, 28)
+		btn.Position = UDim2.new(0, 120 + (i-1)*66, 0.5, -14)
+		btn.Text = opt.label
+		btn.TextSize = 8
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 13
+		corner(btn, 8)
+		stroke(btn, i == 1 and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			combatState.aimPart = opt.key
+			for j, other in ipairs(PART_OPTIONS) do
+				local ob = partCard:GetChildren()[j+3]
+				if ob and ob:IsA("TextButton") then
+					tween(ob, {
+						BackgroundColor3 = j == i and T.ACCENT or T.SURFACE2,
+						TextColor3 = j == i and T.WHITE or T.TEXT3,
+					})
+					stroke(ob, j == i and T.ACCENT or T.BORDER, 1)
+				end
+			end
+			showToast("Aim: " .. opt.label, "ok")
+		end)
+	end
+
+	-- SECTION: PREDICTION & RCS
+	makeSectionLabel(combatPage, "Prediction & RCS", 15)
+
+	makeToggle(combatPage, "🔮 Prediction (Đoán hướng)", true, function(on)
+		combatState.prediction = on
+	end, 16)
+
+	makeSlider(combatPage, "Prediction Amount", 0.1, 1.0, 0.3, function(v)
+		combatState.predictionAmount = v
+	end, 17)
+
+	makeToggle(combatPage, "🎯 RCS (Chống giật)", false, function(on)
+		combatState.rcsEnabled = on
+	end, 18)
+
+	makeSlider(combatPage, "RCS Amount", 0.1, 2.0, 0.5, function(v)
+		combatState.rcsAmount = v
+	end, 19)
+
+	-- SECTION: SHOOT MODE
+	makeSectionLabel(combatPage, "Shoot Mode", 20)
+
+	local shootCard = makeCard(combatPage, 46, 21)
+	newLabel(shootCard, {
+		Text = "🔫 Fire Mode",
+		Color = T.TEXT, Size = 12, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(0, 100, 0, 20),
+		Position = UDim2.new(0, 14, 0, 6), ZIndex = 13,
+	})
+
+	local SHOOT_OPTIONS = {
+		{ label = "Single", key = "single" },
+		{ label = "Burst x3", key = "burst" },
+		{ label = "Auto", key = "auto" },
+	}
+
+	for i, opt in ipairs(SHOOT_OPTIONS) do
+		local btn = Instance.new("TextButton", shootCard)
+		btn.Size = UDim2.new(0, 60, 0, 28)
+		btn.Position = UDim2.new(0, 120 + (i-1)*66, 0.5, -14)
+		btn.Text = opt.label
+		btn.TextSize = 9
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 13
+		corner(btn, 8)
+		stroke(btn, i == 1 and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			combatState.shootMode = opt.key
+			for j, other in ipairs(SHOOT_OPTIONS) do
+				local ob = shootCard:GetChildren()[j+3]
+				if ob and ob:IsA("TextButton") then
+					tween(ob, {
+						BackgroundColor3 = j == i and T.ACCENT or T.SURFACE2,
+						TextColor3 = j == i and T.WHITE or T.TEXT3,
+					})
+					stroke(ob, j == i and T.ACCENT or T.BORDER, 1)
+				end
+			end
+			showToast("Fire Mode: " .. opt.label, "ok")
+		end)
+	end
+
+	-- SECTION: ESP SETTINGS
+	makeSectionLabel(combatPage, "ESP Settings", 22)
+
+	makeToggle(combatPage, "Health Bar", true, function(on)
+		combatState.showHealthBar = on
+	end, 23)
+
+	makeToggle(combatPage, "Name Tag", true, function(on)
+		combatState.showNameTag = on
+	end, 24)
+
+	makeToggle(combatPage, "Skeleton 🦴", false, function(on)
+		combatState.showSkeleton = on
+	end, 25)
+
+	makeToggle(combatPage, "Show Distance 📏", true, function(on)
+		combatState.showDistance = on
+	end, 26)
+
+	makeToggle(combatPage, "Visibility Check", true, function(on)
+		combatState.visibleCheck = on
+	end, 27)
+
+	makeToggle(combatPage, "Wallbang (Bắn xuyên tường)", false, function(on)
+		combatState.wallbang = on
+	end, 28)
+
+	-- SECTION: TARGET INFO
+	makeSectionLabel(combatPage, "Target Info", 29)
+
+	local infoCard = makeCard(combatPage, 10, 30)
+	infoCard.AutomaticSize = Enum.AutomaticSize.Y
+
+	local targetInfoLbl = newLabel(infoCard, {
+		Text = "🎯 No target",
+		Color = T.TEXT2, Size = 11, Font = Enum.Font.Gotham,
+		Sz = UDim2.new(1, 0, 0, 28), ZIndex = 13,
+		AlignX = Enum.TextXAlignment.Center,
+	})
+	targetInfoLbl.LayoutOrder = 1
+
+	-- Update target info
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			if combatState.aimbotEnabled and currentTarget then
+				local char = currentTarget.Character
+				if char then
+					local hum = char:FindFirstChildOfClass("Humanoid")
+					local hp = hum and math.floor(hum.Health) or 0
+					local maxHp = hum and math.floor(hum.MaxHealth) or 0
+					local dist = 0
+					local root = char:FindFirstChild("HumanoidRootPart")
+					local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+					if root and myRoot then
+						dist = math.floor((root.Position - myRoot.Position).Magnitude)
+					end
+					targetInfoLbl.Text = "🎯 " .. currentTarget.DisplayName .. " | HP: " .. hp .. "/" .. maxHp .. " | Dist: " .. dist .. "m"
+					targetInfoLbl.TextColor3 = T.SUCCESS
+				end
+			else
+				targetInfoLbl.Text = "🎯 No target"
+				targetInfoLbl.TextColor3 = T.TEXT2
+			end
+		end
+	end)
+
+	-- SECTION: RESET
+	local resetCombatBtn = Instance.new("TextButton", combatPage)
+	resetCombatBtn.Size = UDim2.new(1, 0, 0, 40)
+	resetCombatBtn.BackgroundColor3 = Color3.fromRGB(38, 18, 18)
+	resetCombatBtn.TextColor3 = T.DANGER
+	resetCombatBtn.Text = "↺  Reset All Combat Settings"
+	resetCombatBtn.TextSize = 12
+	resetCombatBtn.Font = Enum.Font.GothamBold
+	resetCombatBtn.BorderSizePixel = 0
+	resetCombatBtn.ZIndex = 12
+	resetCombatBtn.LayoutOrder = 31
+	corner(resetCombatBtn, 10)
+	stroke(resetCombatBtn, T.DANGER, 1)
+
+	resetCombatBtn.MouseEnter:Connect(function()
+		tween(resetCombatBtn, { BackgroundColor3 = Color3.fromRGB(70, 25, 25) })
+	end)
+	resetCombatBtn.MouseLeave:Connect(function()
+		tween(resetCombatBtn, { BackgroundColor3 = Color3.fromRGB(38, 18, 18) })
+	end)
+
+	resetCombatBtn.MouseButton1Click:Connect(function()
+		toggleAimbot(false)
+		toggleTriggerBot(false)
+		toggleESP(false)
+
+		combatState.silentAim = false
+		combatState.fov = 120
+		combatState.smoothness = 5
+		combatState.triggerDelay = 0.15
+		combatState.targetTeam = "enemy"
+		combatState.aimPart = "Head"
+		combatState.visibleCheck = true
+		combatState.wallbang = false
+		combatState.showHealthBar = true
+		combatState.showNameTag = true
+		combatState.showSkeleton = false
+		combatState.showDistance = true
+		combatState.showFOVCircle = true
+		combatState.prediction = true
+		combatState.predictionAmount = 0.3
+		combatState.rcsEnabled = false
+		combatState.rcsAmount = 0.5
+		combatState.shootMode = "single"
+		combatState.targetPriority = "closest"
+		combatState.holdAim = false
+
+		clearESP()
+		currentTarget = nil
+		if fovCircle then fovCircle.Visible = false end
+
+		showToast("✓ Đã reset Combat Settings", "ok")
+		resetCombatBtn.Text = "✓ Done"
+		task.delay(2, function() resetCombatBtn.Text = "↺ Reset All Combat Settings" end)
+	end)
+end
+
+-- ══════════════════════════════════════════
+-- THÊM VÀO NAV DEFINITIONS
+-- ══════════════════════════════════════════
+-- { name="Combat",   icon="⚔",  order=13, color=T.DANGER, divAfter=false },
+
+-- ══════════════════════════════════════════
 -- TOGGLE BUTTON  (draggable)
 -- ══════════════════════════════════════════
 local ToggleBtn = Instance.new("TextButton", ScreenGui)
@@ -7968,4 +9903,4 @@ task.spawn(function()
 			task.wait(1.8)
 		end
 	end)
-end)  
+end)
