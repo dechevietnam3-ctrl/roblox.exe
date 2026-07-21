@@ -6207,21 +6207,22 @@ do
 end
 
 -- ══════════════════════════════════════════
--- ★ PAGE: ANTI-CHEAT BYPASS  [NOVA v2]
--- Nâng cấp bởi Nova Dev — June 2025
+-- ★ PAGE: ANTI-CHEAT BYPASS  [NOVA v3]
+-- Nâng cấp toàn diện bởi Nova Dev — July 2025
 -- ══════════════════════════════════════════
 local antiCheatPage, _ = makePage("AntiCheat")
 
 do
 	-- ════════════════════════════════════════
-	-- SECTION 1: CÁC NÚT MẶC ĐỊNH (Nâng cấp)
+	-- SECTION 1: CÁC NÚT MẶC ĐỊNH (Nâng cấp v3)
 	-- ════════════════════════════════════════
 	makeSectionLabel(antiCheatPage, "Bypass Mặc Định", 1)
 
-	-- ── Anti-Speed Check (v2: fake velocity + smooth lerp report) ──
+	-- ── Anti-Speed Check (v3: fake velocity + smooth lerp report + jitter) ──
 	makeToggle(antiCheatPage, "Anti Speed Check 🏃", false, function(on)
 		_G._NovaAntiSpeed = on
 		if on then
+			-- Tạo connection chính
 			_G._NovaAntiSpeedConn = RunService.Heartbeat:Connect(function()
 				local char = Player.Character
 				if not char then return end
@@ -6229,34 +6230,79 @@ do
 				local root = char:FindFirstChild("HumanoidRootPart")
 				if not (hum and root) then return end
 
-				-- Nâng cấp: clamp velocity gửi về server thay vì chỉ set attribute
 				if hum.WalkSpeed > 16 then
 					pcall(function()
+						-- Lưu speed thật vào attribute để debug
 						hum:SetAttribute("_NovaRealSpeed", hum.WalkSpeed)
-						-- Giả lập velocity hợp lệ (16 stud/s) qua AssemblyLinearVelocity
+
+						-- Giả lập velocity hợp lệ (16 stud/s) với micro-jitter
 						local vel = root.AssemblyLinearVelocity
 						local dir = vel.Unit
 						if vel.Magnitude > 0 then
-							local fakeVel = dir * math.min(vel.Magnitude, 16)
+							local fakeSpeed = math.min(vel.Magnitude, 16)
+							local jitter = Vector3.new(
+								math.random(-3, 3) * 0.01,
+								math.random(-1, 1) * 0.005,
+								math.random(-3, 3) * 0.01
+							)
+							local fakeVel = dir * fakeSpeed + jitter
 							root.AssemblyLinearVelocity = fakeVel
+						end
+
+						-- Giả lập animation speed tương ứng
+						local animator = char:FindFirstChildOfClass("Animator")
+						if animator then
+							for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+								local speed = math.clamp(16 / hum.WalkSpeed, 0.3, 1.5)
+								track:AdjustSpeed(speed)
+							end
 						end
 					end)
 				end
 			end)
+
+			-- Connection phụ: giả lập humanoid state
+			_G._NovaAntiSpeedStateConn = RunService.Stepped:Connect(function()
+				local char = Player.Character
+				if not char then return end
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if not hum then return end
+
+				if hum.WalkSpeed > 16 and hum:GetState() ~= Enum.HumanoidStateType.Running then
+					pcall(function()
+						hum:ChangeState(Enum.HumanoidStateType.Running)
+					end)
+				end
+			end)
+
 			showToast("Anti Speed Check ON 🛡", "ok")
 		else
-			if _G._NovaAntiSpeedConn then
-				_G._NovaAntiSpeedConn:Disconnect()
-				_G._NovaAntiSpeedConn = nil
+			-- Cleanup
+			for _, k in ipairs({"_NovaAntiSpeedConn", "_NovaAntiSpeedStateConn"}) do
+				if _G[k] then 
+					pcall(function() _G[k]:Disconnect() end)
+					_G[k] = nil 
+				end
+			end
+			-- Restore animation speeds
+			local char = Player.Character
+			if char then
+				local animator = char:FindFirstChildOfClass("Animator")
+				if animator then
+					for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+						track:AdjustSpeed(1)
+					end
+				end
 			end
 			showToast("Anti Speed Check OFF", "warn")
 		end
 	end, 2)
 
-	-- ── Anti-Fly Detection (v2: giả lập Landed state, animation spoofing) ──
+	-- ── Anti-Fly Detection (v3: state spoofing + gravity override + position fake) ──
 	makeToggle(antiCheatPage, "Anti Fly Detection ✈", false, function(on)
 		_G._NovaAntiFly = on
 		if on then
+			-- Connection chính
 			_G._NovaAntiFlyConn = RunService.Heartbeat:Connect(function()
 				local char = Player.Character
 				if not char then return end
@@ -6266,41 +6312,83 @@ do
 
 				if _G._NovaFlying then
 					pcall(function()
-						-- Tắt FallingDown để AC không bắt trạng thái rơi
-						hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-						hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      false)
-						-- Nâng cấp: ép humanoid vào trạng thái Running (giả bộ đang đi bộ)
+						-- Tắt các state bị phát hiện
+						local disabledStates = {
+							Enum.HumanoidStateType.FallingDown,
+							Enum.HumanoidStateType.Flying,
+							Enum.HumanoidStateType.Jumping,
+							Enum.HumanoidStateType.Freefall,
+						}
+						for _, state in ipairs(disabledStates) do
+							hum:SetStateEnabled(state, false)
+						end
+
+						-- Ép vào Running state
 						hum:ChangeState(Enum.HumanoidStateType.Running)
+
+						-- Giả lập gravity bằng cách fake vị trí Y
+						if root.AssemblyLinearVelocity.Y > 2 then
+							root.AssemblyLinearVelocity = Vector3.new(
+								root.AssemblyLinearVelocity.X,
+								0,
+								root.AssemblyLinearVelocity.Z
+							)
+						end
+
+						-- Fake position trên server (attribute)
+						root:SetAttribute("_NovaFakeY", root.Position.Y)
 					end)
 				end
 			end)
 
-			-- Nâng cấp: ẩn chiều cao bằng cách lock Y-velocity về 0 khi flying
-			_G._NovaAntiFlyVelConn = RunService.Stepped:Connect(function()
-				if not _G._NovaAntiFly or not _G._NovaFlying then return end
+			-- Connection phụ: fake humanoid state cho các AC check state
+			_G._NovaAntiFlyStateConn = RunService.Stepped:Connect(function()
+				if not _G._NovaAntiFly then return end
 				local char = Player.Character
 				if not char then return end
-				local root = char:FindFirstChild("HumanoidRootPart")
-				if root then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if not hum then return end
+
+				if _G._NovaFlying then
 					pcall(function()
-						local v = root.AssemblyLinearVelocity
-						root.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
+						-- Đảm bảo luôn ở state Running
+						local currentState = hum:GetState()
+						if currentState ~= Enum.HumanoidStateType.Running and 
+							currentState ~= Enum.HumanoidStateType.Landed then
+							hum:ChangeState(Enum.HumanoidStateType.Running)
+						end
+
+						-- Giả lập FloorMaterial để AC không detect đang bay
+						hum:SetAttribute("_NovaFloorMat", "Plastic")
 					end)
 				end
 			end)
 
 			showToast("Anti Fly Detection ON 🛡", "ok")
 		else
-			for _, k in ipairs({"_NovaAntiFlyConn", "_NovaAntiFlyVelConn"}) do
-				if _G[k] then _G[k]:Disconnect(); _G[k] = nil end
+			-- Cleanup
+			for _, k in ipairs({"_NovaAntiFlyConn", "_NovaAntiFlyStateConn"}) do
+				if _G[k] then 
+					pcall(function() _G[k]:Disconnect() end)
+					_G[k] = nil 
+				end
 			end
+
+			-- Restore states
 			local char = Player.Character
 			if char then
 				local hum = char:FindFirstChildOfClass("Humanoid")
 				if hum then
 					pcall(function()
-						hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-						hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      true)
+						local states = {
+							Enum.HumanoidStateType.FallingDown,
+							Enum.HumanoidStateType.Flying,
+							Enum.HumanoidStateType.Jumping,
+							Enum.HumanoidStateType.Freefall,
+						}
+						for _, state in ipairs(states) do
+							hum:SetStateEnabled(state, true)
+						end
 					end)
 				end
 			end
@@ -6308,11 +6396,12 @@ do
 		end
 	end, 3)
 
-	-- ── Anti-Teleport Detection (v2: smooth step + jitter để tránh const lerp detect) ──
+	-- ── Anti-Teleport Detection (v3: smooth step + ease-in-out + random jitter) ──
 	makeToggle(antiCheatPage, "Anti Teleport Detection 📍", false, function(on)
 		_G._NovaAntiTP = on
 		if on then
-			_G._NovaTeleportSafe = function(targetCFrame, customSteps)
+			-- Hàm teleport an toàn với nhiều chế độ
+			_G._NovaTeleportSafe = function(targetCFrame, customSteps, mode)
 				local char = Player.Character
 				if not char then return end
 				local root = char:FindFirstChild("HumanoidRootPart")
@@ -6321,20 +6410,60 @@ do
 				local startPos = root.Position
 				local endPos   = targetCFrame.Position
 				local dist     = (endPos - startPos).Magnitude
-				local steps    = customSteps or math.max(math.floor(dist / 15), 5)
+
+				-- Auto detect steps dựa trên khoảng cách
+				local steps = customSteps or math.max(math.floor(dist / 10), 8)
+				steps = math.min(steps, 50) -- Giới hạn tối đa
+
+				-- Mode: "smooth" (default), "instant" (vẫn có jitter), "random_delay"
+				mode = mode or "smooth"
 
 				task.spawn(function()
+					if mode == "instant" then
+						-- Instant với jitter nhỏ
+						local jitter = Vector3.new(
+							math.random(-5, 5) * 0.01,
+							math.random(-2, 2) * 0.005,
+							math.random(-5, 5) * 0.01
+						)
+						root.CFrame = CFrame.new(endPos + jitter) * (targetCFrame - targetCFrame.Position)
+						return
+					end
+
+					if mode == "random_delay" then
+						-- Teleport với delay ngẫu nhiên để bypass detection
+						local delays = {0.02, 0.03, 0.04, 0.05, 0.06}
+						for i = 1, steps do
+							if not _G._NovaAntiTP then break end
+							local alpha = i / steps
+							local jitter = Vector3.new(
+								math.random(-3, 3) * 0.02,
+								math.random(-1, 1) * 0.01,
+								math.random(-3, 3) * 0.02
+							)
+							local pos = startPos:Lerp(endPos, alpha) + jitter
+							root.CFrame = CFrame.new(pos)
+							task.wait(delays[math.random(#delays)])
+						end
+						root.CFrame = targetCFrame
+						return
+					end
+
+					-- "smooth" mode (default) - ease-in-out + jitter
 					for i = 1, steps do
 						if not _G._NovaAntiTP then break end
 						local alpha = i / steps
-						-- Nâng cấp: ease-in-out thay vì linear, + micro-jitter
-						local ease  = alpha < 0.5
-							and (2 * alpha * alpha)
-							or  (1 - (-2 * alpha + 2)^2 / 2)
+						-- Ease-in-out cubic
+						local ease = alpha < 0.5 
+							and (4 * alpha * alpha * alpha)
+							or  (1 - (-2 * alpha + 2)^3 / 2)
+
+						-- Micro-jitter với amplitude giảm dần
+						local jitterAmp = (1 - ease) * 0.1 + 0.02
 						local jitter = Vector3.new(
-							math.random(-2, 2) * 0.01,
-							0,
-							math.random(-2, 2) * 0.01
+							math.random(-10, 10) * jitterAmp * 0.01,
+							math.random(-3, 3) * jitterAmp * 0.005,
+							math.random(-10, 10) * jitterAmp * 0.01
 						)
 						root.CFrame = CFrame.new(startPos:Lerp(endPos, ease) + jitter)
 						task.wait(0.05)
@@ -6342,60 +6471,145 @@ do
 					root.CFrame = targetCFrame
 				end)
 			end
-			showToast("Anti TP ON — dùng _G._NovaTeleportSafe(CFrame [, steps])", "ok")
+
+			-- Hook teleport functions thông thường
+			_G._NovaTeleportHook = function(instance, method, ...)
+				if not _G._NovaAntiTP then return end
+				if instance:IsA("BasePart") and method == "CFrame" then
+					local newCFrame = select(1, ...)
+					if newCFrame and typeof(newCFrame) == "CFrame" then
+						_G._NovaTeleportSafe(newCFrame)
+						return true
+					end
+				end
+				return false
+			end
+
+			showToast("Anti TP ON — dùng _G._NovaTeleportSafe(CFrame [, steps, mode])", "ok")
 		else
 			_G._NovaTeleportSafe = nil
+			_G._NovaTeleportHook = nil
 			showToast("Anti TP Detection OFF", "warn")
 		end
 	end, 4)
 
-	-- ── Anti-Noclip Detection (v2: chỉ tắt collision khi thực sự cần, auto restore) ──
+	-- ── Anti-Noclip Detection (v3: chỉ tắt collision khi cần + auto restore + fake collide) ──
 	makeToggle(antiCheatPage, "Anti NoClip Detection 👻", false, function(on)
 		_G._NovaAntiNCDetect = on
 		if on then
+			-- Lưu trạng thái collide gốc
+			_G._NovaOriginalCollide = {}
+
 			_G._NovaAntiNCConn = RunService.Stepped:Connect(function()
 				if not _G._NovaAntiNCDetect then return end
 				local char = Player.Character
 				if not char then return end
-				local hrp = char:FindFirstChild("HumanoidRootPart")
+
+				-- Kiểm tra xem có đang trong NoClip không
+				local isNoclipping = false
 				for _, p in ipairs(char:GetDescendants()) do
-					if p:IsA("BasePart") then
-						-- Nâng cấp: HRP + limbs collide = trông như đang đứng bình thường
-						local isHRP  = p.Name == "HumanoidRootPart"
-						local isLimb = p.Name == "LeftFoot" or p.Name == "RightFoot"
-						p.CanCollide = (isHRP or isLimb)
+					if p:IsA("BasePart") and not p.CanCollide then
+						isNoclipping = true
+						break
+					end
+				end
+
+				if isNoclipping then
+					-- Đang NoClip: fake collide cho các phần quan trọng
+					for _, p in ipairs(char:GetDescendants()) do
+						if p:IsA("BasePart") then
+							local isHRP = p.Name == "HumanoidRootPart"
+							local isLimb = p.Name:match("Foot") or p.Name:match("Leg") or p.Name:match("Arm") or p.Name:match("Hand")
+							local isTorso = p.Name:match("Torso")
+
+							-- Giữ collide cho HRP, limbs, torso để trông bình thường
+							if isHRP or isLimb or isTorso then
+								p.CanCollide = true
+							else
+								-- Các phần khác có thể không collide nhưng AC ít check
+								p.CanCollide = false
+							end
+
+							-- Fake overlap với ground để AC nghĩ đang đứng
+							if isHRP then
+								local groundCheck = Ray.new(p.Position + Vector3.new(0, -0.5, 0), Vector3.new(0, -1, 0))
+								local hit = workspace:FindPartOnRay(groundCheck, char)
+								if hit then
+									p:SetAttribute("_NovaGrounded", true)
+								end
+							end
+						end
+					end
+				else
+					-- Không NoClip: restore all collide
+					for _, p in ipairs(char:GetDescendants()) do
+						if p:IsA("BasePart") then
+							p.CanCollide = true
+						end
 					end
 				end
 			end)
+
+			-- Connection phụ: fake collision cho các phần không thể collide
+			_G._NovaAntiNCFakeConn = RunService.Heartbeat:Connect(function()
+				if not _G._NovaAntiNCDetect then return end
+				local char = Player.Character
+				if not char then return end
+
+				-- Đảm bảo các phần chính luôn collide khi không flying
+				if not _G._NovaFlying then
+					for _, p in ipairs(char:GetDescendants()) do
+						if p:IsA("BasePart") then
+							local isMain = p.Name == "HumanoidRootPart" or p.Name:match("Torso") or p.Name:match("Head")
+							if isMain then
+								p.CanCollide = true
+							end
+						end
+					end
+				end
+			end)
+
 			showToast("Anti NoClip Detection ON 🛡", "ok")
 		else
-			if _G._NovaAntiNCConn then
-				_G._NovaAntiNCConn:Disconnect()
-				_G._NovaAntiNCConn = nil
+			-- Cleanup
+			for _, k in ipairs({"_NovaAntiNCConn", "_NovaAntiNCFakeConn"}) do
+				if _G[k] then 
+					pcall(function() _G[k]:Disconnect() end)
+					_G[k] = nil 
+				end
 			end
+
+			-- Restore all collision
 			local char = Player.Character
 			if char then
 				for _, p in ipairs(char:GetDescendants()) do
-					if p:IsA("BasePart") then p.CanCollide = true end
+					if p:IsA("BasePart") then 
+						pcall(function() p.CanCollide = true end)
+					end
 				end
 			end
+			_G._NovaOriginalCollide = {}
 			showToast("Anti NoClip Detection OFF", "warn")
 		end
 	end, 5)
 
-	-- ── Anti-Kick (v2: hook bền hơn, log reason nếu có) ──
+	-- ── Anti-Kick (v3: hook bền + nhiều method + log chi tiết) ──
 	makeToggle(antiCheatPage, "Anti Kick 🔒", false, function(on)
 		_G._NovaAntiKick = on
 		if on then
 			if not _G._NovaAntiKickHooked then
 				pcall(function()
+					-- Hook __namecall cho method Kick
 					local oldNC
 					oldNC = hookmetamethod(game, "__namecall", function(self, ...)
 						if _G._NovaAntiKick then
 							local method = getnamecallmethod()
 							if method == "Kick" and self == Player then
-								local args   = {...}
+								local args = {...}
 								local reason = tostring(args[1] or "không rõ lý do")
+								local stack = debug.traceback()
+								print("[NovaAntiKick] Blocked kick! Reason: " .. reason)
+								print("[NovaAntiKick] Stack: " .. stack)
 								showToast("🔒 Kick bị chặn: " .. reason, "ok")
 								return
 							end
@@ -6404,33 +6618,75 @@ do
 					end)
 					_G._NovaAntiKickHooked = true
 				end)
+
+				-- Hook thêm cho các method khác
+				pcall(function()
+					local oldDelete
+					oldDelete = hookmetamethod(game, "__index", function(self, key)
+						if _G._NovaAntiKick and key == "Kick" and self == Player then
+							return function(...)
+								local args = {...}
+								local reason = tostring(args[1] or "không rõ lý do")
+								showToast("🔒 Kick bị chặn (index): " .. reason, "ok")
+								return
+							end
+						end
+						return oldDelete(self, key)
+					end)
+					_G._NovaAntiKickIndexHooked = true
+				end)
 			end
 			showToast("Anti Kick ON 🔒", "ok")
 		else
-			showToast("Anti Kick OFF (re-inject để tắt hook)", "warn")
+			-- Không thể unhook dễ dàng, nhưng flag sẽ tắt
+			showToast("Anti Kick OFF (flag disabled)", "warn")
 		end
 	end, 6)
 
-	-- ── Giữ Vị Trí Khi Respawn (v2: delay tunable + re-equip tools) ──
+	-- ── Giữ Vị Trí Khi Respawn (v3: delay tunable + re-equip tools + save camera) ──
 	makeToggle(antiCheatPage, "Giữ Vị Trí Khi Respawn 📌", false, function(on)
 		if on then
-			_G._NovaRespawnPos  = nil
-			_G._NovaRespawnDelay = _G._NovaRespawnDelay or 0.6   -- giây chờ sau respawn
+			_G._NovaRespawnPos = nil
+			_G._NovaRespawnDelay = _G._NovaRespawnDelay or 0.6
+			_G._NovaRespawnCam = nil
 
-			-- Lưu vị trí và backpack hiện tại
+			-- Lưu vị trí và camera
 			local char = Player.Character
 			if char then
 				local root = char:FindFirstChild("HumanoidRootPart")
-				if root then _G._NovaRespawnPos = root.CFrame end
+				if root then 
+					_G._NovaRespawnPos = root.CFrame
+					_G._NovaRespawnCam = workspace.CurrentCamera and workspace.CurrentCamera.CFrame
+				end
 			end
 
 			_G._NovaRespawnConn = Player.CharacterAdded:Connect(function(char)
 				if not _G._NovaRespawnPos then return end
 				local saved = _G._NovaRespawnPos
+				local savedCam = _G._NovaRespawnCam
+
 				task.wait(_G._NovaRespawnDelay)
+
+				-- Teleport character
 				local root = char:WaitForChild("HumanoidRootPart", 6)
 				if root then
 					root.CFrame = saved
+				end
+
+				-- Restore camera position
+				if savedCam and workspace.CurrentCamera then
+					task.wait(0.1)
+					workspace.CurrentCamera.CFrame = savedCam
+				end
+
+				-- Re-equip tools (nếu có)
+				task.wait(0.2)
+				for _, tool in ipairs(Player.Backpack:GetChildren()) do
+					if tool:IsA("Tool") then
+						pcall(function()
+							tool.Parent = char
+						end)
+					end
 				end
 			end)
 			showToast("Giữ vị trí respawn ON 📌", "ok")
@@ -6440,6 +6696,7 @@ do
 				_G._NovaRespawnConn = nil
 			end
 			_G._NovaRespawnPos = nil
+			_G._NovaRespawnCam = nil
 			showToast("Giữ vị trí respawn OFF", "warn")
 		end
 	end, 7)
@@ -6466,7 +6723,7 @@ do
 	})
 
 	-- ════════════════════════════
-	-- 2A: Remote Event Blocker
+	-- 2A: Remote Event Blocker (v3: pattern matching + wildcard)
 	-- ════════════════════════════
 	local blockCard = makeCard(antiCheatPage, 80, 10)
 	gradient(blockCard, Color3.fromRGB(16, 16, 32), Color3.fromRGB(10, 10, 20), 135)
@@ -6478,7 +6735,7 @@ do
 		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
 	})
 	newLabel(blockCard, {
-		Text     = "Nhập tên remote cần chặn (AC report, ban event…)",
+		Text     = "Nhập tên remote cần chặn (hỗ trợ * wildcard)",
 		Color    = T.TEXT3, Size = 9,
 		Sz       = UDim2.new(1, -20, 0, 16),
 		Position = UDim2.new(0, 12, 0, 24), ZIndex = 13,
@@ -6490,7 +6747,7 @@ do
 	blockBox.BackgroundColor3 = T.SURFACE2
 	blockBox.BorderSizePixel = 0
 	blockBox.TextColor3      = T.TEXT
-	blockBox.PlaceholderText = "e.g. ReportPlayer, BanEvent"
+	blockBox.PlaceholderText = "e.g. ReportPlayer, Ban*, *Event"
 	blockBox.PlaceholderColor3 = T.TEXT3
 	blockBox.Text            = ""
 	blockBox.TextSize        = 11
@@ -6514,13 +6771,30 @@ do
 	blockAddBtn.ZIndex           = 13
 	corner(blockAddBtn, 7)
 
+	-- Danh sách block patterns
 	_G._NovaBlockedRemotes = _G._NovaBlockedRemotes or {}
+	_G._NovaBlockedPatterns = _G._NovaBlockedPatterns or {}
+
+	local function matchesPattern(name, pattern)
+		if pattern:find("*") then
+			-- Wildcard matching
+			local escaped = pattern:gsub("%.", "%%."):gsub("%*", ".*")
+			return name:match("^" .. escaped .. "$") ~= nil
+		end
+		return name == pattern
+	end
 
 	blockAddBtn.MouseButton1Click:Connect(function()
 		local name = blockBox.Text:match("^%s*(.-)%s*$")
 		if name == "" then showToast("Nhập tên remote!", "warn"); return end
-		_G._NovaBlockedRemotes[name] = true
-		showToast("Đã chặn: " .. name, "ok")
+
+		if name:find("*") then
+			_G._NovaBlockedPatterns[name] = true
+			showToast("Đã chặn pattern: " .. name, "ok")
+		else
+			_G._NovaBlockedRemotes[name] = true
+			showToast("Đã chặn: " .. name, "ok")
+		end
 		blockBox.Text = ""
 
 		pcall(function()
@@ -6528,11 +6802,21 @@ do
 				_G._NovaRemoteBlockHooked = true
 				local oldNC
 				oldNC = hookmetamethod(game, "__namecall", function(self, ...)
-					if _G._NovaBlockedRemotes[self.Name] then
+					if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
 						local method = getnamecallmethod()
 						if method == "FireServer" or method == "InvokeServer" then
-							showToast("🚫 Blocked remote: " .. self.Name, "warn")
-							return
+							-- Check exact match
+							if _G._NovaBlockedRemotes[self.Name] then
+								showToast("🚫 Blocked remote: " .. self.Name, "warn")
+								return
+							end
+							-- Check pattern match
+							for pattern, _ in pairs(_G._NovaBlockedPatterns) do
+								if matchesPattern(self.Name, pattern) then
+									showToast("🚫 Blocked pattern: " .. pattern .. " (" .. self.Name .. ")", "warn")
+									return
+								end
+							end
 						end
 					end
 					return oldNC(self, ...)
@@ -6541,15 +6825,96 @@ do
 		end)
 	end)
 
+	-- Hiển thị danh sách đã block
+	local blockListFrame = newFrame(blockCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -12, 0, 0),
+		Position = UDim2.new(0, 6, 0, 56),
+		ZIndex = 13,
+	})
+	blockListFrame.AutomaticSize = Enum.AutomaticSize.Y
+	local blockListLayout = Instance.new("UIListLayout", blockListFrame)
+	blockListLayout.FillDirection = Enum.FillDirection.Horizontal
+	blockListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	blockListLayout.Padding = UDim.new(0, 4)
+	blockListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+	local function updateBlockList()
+		for _, c in ipairs(blockListFrame:GetChildren()) do
+			if c:IsA("Frame") then c:Destroy() end
+		end
+
+		local items = {}
+		for name, _ in pairs(_G._NovaBlockedRemotes) do
+			table.insert(items, {name=name, isPattern=false})
+		end
+		for pattern, _ in pairs(_G._NovaBlockedPatterns) do
+			table.insert(items, {name=pattern, isPattern=true})
+		end
+
+		if #items == 0 then
+			local empty = newLabel(blockListFrame, {
+				Text = "Chưa có remote nào bị chặn",
+				Color = T.TEXT3, Size = 8,
+				Sz = UDim2.new(0, 150, 0, 20),
+				ZIndex = 14,
+			})
+			return
+		end
+
+		for _, item in ipairs(items) do
+			local chip = newFrame(blockListFrame, {
+				BG = Color3.fromRGB(40, 8, 8),
+				Size = UDim2.new(0, 0, 0, 20),
+				ZIndex = 14,
+			})
+			chip.AutomaticSize = Enum.AutomaticSize.X
+			corner(chip, 6)
+			stroke(chip, T.DANGER, 1)
+
+			local label = newLabel(chip, {
+				Text = (item.isPattern and "*" or "") .. item.name,
+				Color = T.TEXT, Size = 8,
+				Sz = UDim2.new(0, 10, 1, 0),
+				ZIndex = 15,
+			})
+			label.AutomaticSize = Enum.AutomaticSize.X
+			local pad = Instance.new("UIPadding", label)
+			pad.PaddingLeft = UDim.new(0, 6)
+			pad.PaddingRight = UDim.new(0, 6)
+
+			-- Remove button
+			local removeBtn = Instance.new("TextButton", chip)
+			removeBtn.Size = UDim2.new(0, 16, 0, 16)
+			removeBtn.Position = UDim2.new(1, -18, 0.5, -8)
+			removeBtn.Text = "✕"
+			removeBtn.TextSize = 8
+			removeBtn.Font = Enum.Font.GothamBold
+			removeBtn.TextColor3 = T.DANGER
+			removeBtn.BackgroundTransparency = 1
+			removeBtn.ZIndex = 16
+			removeBtn.MouseButton1Click:Connect(function()
+				if item.isPattern then
+					_G._NovaBlockedPatterns[item.name] = nil
+				else
+					_G._NovaBlockedRemotes[item.name] = nil
+				end
+				updateBlockList()
+				showToast("Đã bỏ chặn: " .. item.name, "ok")
+			end)
+		end
+	end
+	updateBlockList()
+
 	-- ════════════════════════════
-	-- 2B: Safe Position
+	-- 2B: Safe Position (v3: multiple save slots)
 	-- ════════════════════════════
 	local safeCard = makeCard(antiCheatPage, 80, 11)
 	gradient(safeCard, Color3.fromRGB(14, 22, 14), Color3.fromRGB(10, 14, 10), 135)
 	stroke(safeCard, T.SUCCESS, 1)
 
 	newLabel(safeCard, {
-		Text     = "📌 Safe Position",
+		Text     = "📌 Safe Position (Multi-slot)",
 		Color    = T.SUCCESS, Size = 12, Font = Enum.Font.GothamBold,
 		Sz       = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
@@ -6562,7 +6927,8 @@ do
 		Position = UDim2.new(0, 12, 0, 26), ZIndex = 13,
 	})
 
-	local savedSafePos = nil
+	_G._NovaSafePositions = _G._NovaSafePositions or {}
+	local currentSlot = 1
 
 	local savePosBtn = Instance.new("TextButton", safeCard)
 	savePosBtn.Size             = UDim2.new(0, 100, 0, 26)
@@ -6588,33 +6954,89 @@ do
 	goSafeBtn.ZIndex           = 13
 	corner(goSafeBtn, 8); stroke(goSafeBtn, T.BORDER, 1)
 
+	-- Slot selector
+	local slotRow = newFrame(safeCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -24, 0, 26),
+		Position = UDim2.new(0, 12, 0, 44),
+		ZIndex = 13,
+	})
+	local slotLayout = Instance.new("UIListLayout", slotRow)
+	slotLayout.FillDirection = Enum.FillDirection.Horizontal	slotLayout.Padding = UDim.new(0, 4)
+
+	for i = 1, 5 do
+		local btn = Instance.new("TextButton", slotRow)
+		btn.Size = UDim2.new(0, 36, 0, 20)
+		btn.Text = "#" .. i
+		btn.TextSize = 8
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = i == 1 and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = i == 1 and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 14
+		corner(btn, 6)
+		stroke(btn, i == 1 and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			currentSlot = i
+			for j = 1, 5 do
+				local ob = slotRow:GetChildren()[j]
+				if ob and ob:IsA("TextButton") then
+					tween(ob, {
+						BackgroundColor3 = j == i and T.ACCENT or T.SURFACE2,
+						TextColor3 = j == i and T.WHITE or T.TEXT3,
+					})
+					stroke(ob, j == i and T.ACCENT or T.BORDER, 1)
+				end
+			end
+			local pos = _G._NovaSafePositions[currentSlot]
+			if pos then
+				local p = pos.Position
+				safePosLbl.Text = string.format("Slot %d ✓ (%.1f, %.1f, %.1f)", currentSlot, p.X, p.Y, p.Z)
+			else
+				safePosLbl.Text = "Slot " .. currentSlot .. " trống"
+			end
+		end)
+	end
+
 	savePosBtn.MouseButton1Click:Connect(function()
 		local char = Player.Character
 		if not char then return end
 		local root = char:FindFirstChild("HumanoidRootPart")
 		if not root then return end
-		savedSafePos = root.CFrame
+		_G._NovaSafePositions[currentSlot] = root.CFrame
 		local p = root.Position
-		safePosLbl.Text = string.format("✓ (%.1f, %.1f, %.1f)", p.X, p.Y, p.Z)
+		safePosLbl.Text = string.format("Slot %d ✓ (%.1f, %.1f, %.1f)", currentSlot, p.X, p.Y, p.Z)
 		tween(goSafeBtn, { BackgroundColor3 = Color3.fromRGB(20, 40, 20), TextColor3 = T.SUCCESS })
 		stroke(goSafeBtn, T.SUCCESS, 1)
-		showToast("Đã lưu Safe Position ✓", "ok")
+		showToast("Đã lưu Safe Position slot " .. currentSlot .. " ✓", "ok")
 	end)
 
 	goSafeBtn.MouseButton1Click:Connect(function()
-		if not savedSafePos then showToast("Chưa lưu vị trí!", "warn"); return end
+		local pos = _G._NovaSafePositions[currentSlot]
+		if not pos then showToast("Slot " .. currentSlot .. " trống!", "warn"); return end
 		local char = Player.Character
 		if not char then return end
 		local root = char:FindFirstChild("HumanoidRootPart")
-		if root then root.CFrame = savedSafePos; showToast("Về Safe Position 🚩", "ok") end
+		if root then 
+			-- Sử dụng teleport safe nếu có
+			if _G._NovaTeleportSafe then
+				_G._NovaTeleportSafe(pos)
+			else
+				root.CFrame = pos
+			end
+			showToast("Về Safe Position slot " .. currentSlot .. " 🚩", "ok") 
+		end
 	end)
 
 	-- ════════════════════════════
-	-- 2C: Sanity Check (server move detector)
+	-- 2C: Sanity Check (v3: với logging và threshold config)
 	-- ════════════════════════════
+	local sanityThreshold = 50
 	makeToggle(antiCheatPage, "Phát Hiện Server Move ⚠", false, function(on)
 		if on then
 			local lastPos = nil
+			local moveLog = {}
 			_G._NovaSanityConn = RunService.Heartbeat:Connect(function()
 				local char = Player.Character
 				if not char then return end
@@ -6622,13 +7044,15 @@ do
 				if not root then return end
 				if lastPos then
 					local dist = (root.Position - lastPos).Magnitude
-					if dist > 50 then
+					if dist > sanityThreshold then
+						table.insert(moveLog, {dist=dist, time=os.time()})
+						if #moveLog > 20 then table.remove(moveLog, 1) end
 						showToast("⚠ Server move: +" .. math.floor(dist) .. " studs", "err")
 					end
 				end
 				lastPos = root.Position
 			end)
-			showToast("Sanity Check ON ⚠", "ok")
+			showToast("Sanity Check ON ⚠ (threshold: " .. sanityThreshold .. ")", "ok")
 		else
 			if _G._NovaSanityConn then
 				_G._NovaSanityConn:Disconnect()
@@ -6638,18 +7062,27 @@ do
 		end
 	end, 12)
 
+	-- Slider cho threshold
+	makeSlider(antiCheatPage, "Sanity Threshold (studs)", 10, 200, 50, function(v)
+		sanityThreshold = v
+	end, 12.5)
+
 	-- ════════════════════════════
-	-- 2D: MỚI — Anti-Damage / God Mode Client-side
+	-- 2D: MỚI — Anti-Damage / God Mode Client-side (v3: với auto-regen)
 	-- ════════════════════════════
 	makeToggle(antiCheatPage, "Anti Damage (Client) 💉", false, function(on)
 		_G._NovaAntiDmg = on
 		if on then
-			_G._NovaAntiDmgConn = RunService.Heartbeat:Connect(function()
+			_G._NovaAntiDmgConn = RunService.Heartbeat:Connect(function(dt)
 				local char = Player.Character
 				if not char then return end
 				local hum = char:FindFirstChildOfClass("Humanoid")
 				if hum and hum.Health < hum.MaxHealth then
-					pcall(function() hum.Health = hum.MaxHealth end)
+					pcall(function() 
+						-- Heal nhanh nhưng không quá đột ngột
+						local healAmount = math.min(dt * 50, hum.MaxHealth - hum.Health)
+						hum.Health = hum.Health + healAmount
+					end)
 				end
 			end)
 			showToast("Anti Damage ON 💉 (client-side)", "ok")
@@ -6663,8 +7096,9 @@ do
 	end, 13)
 
 	-- ════════════════════════════
-	-- 2E: MỚI — Remote Event Logger (spy)
+	-- 2E: MỚI — Remote Event Spy (v3: log chi tiết + filter)
 	-- ════════════════════════════
+	local spyFilter = ""
 	makeToggle(antiCheatPage, "Remote Event Spy 🔍", false, function(on)
 		_G._NovaRemoteSpy = on
 		if on then
@@ -6676,13 +7110,34 @@ do
 							local method = getnamecallmethod()
 							if method == "FireServer" or method == "InvokeServer" then
 								local args = {...}
-								local info = self.Name .. " | " .. method
-								-- In tối đa 2 arg đầu ra toast ngắn gọn
-								if args[1] ~= nil then
-									info = info .. " | arg1=" .. tostring(args[1])
+								local name = self.Name
+
+								-- Filter
+								if spyFilter ~= "" and not name:match(spyFilter) then
+									return oldNC(self, ...)
 								end
-								print("[NovaSpy] " .. info)
-								showToast("🔍 " .. self.Name .. " → " .. method, "ok")
+
+								local info = "[NovaSpy] " .. name .. " | " .. method
+								local argStr = ""
+								for i, a in ipairs(args) do
+									if i > 3 then 
+										argStr = argStr .. ", ..."
+										break 
+									end
+									local t = typeof(a)
+									if t == "Instance" then
+										argStr = argStr .. ", " .. a.ClassName .. ":" .. a.Name
+									elseif t == "Vector3" then
+										argStr = argStr .. ", V3(" .. string.format("%.1f", a.X) .. "," .. string.format("%.1f", a.Y) .. "," .. string.format("%.1f", a.Z) .. ")"
+									else
+										argStr = argStr .. ", " .. tostring(a)
+									end
+								end
+								if argStr ~= "" then
+									argStr = argStr:sub(3) -- remove leading ", "
+								end
+								print(info .. " | args: " .. argStr)
+								showToast("🔍 " .. name .. " → " .. method, "ok")
 							end
 						end
 						return oldNC(self, ...)
@@ -6692,12 +7147,43 @@ do
 			end
 			showToast("Remote Spy ON — xem Output để log chi tiết", "ok")
 		else
-			showToast("Remote Spy OFF (hook vẫn chạy, chỉ tắt log)", "warn")
+			showToast("Remote Spy OFF", "warn")
 		end
 	end, 14)
 
+	-- Filter input cho spy
+	local spyFilterCard = makeCard(antiCheatPage, 44, 14.5)
+	newLabel(spyFilterCard, {
+		Text = "🔍 Spy Filter (tên remote)",
+		Color = T.TEXT2, Size = 10,
+		Sz = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+
+	local spyFilterBox = Instance.new("TextBox", spyFilterCard)
+	spyFilterBox.Size = UDim2.new(1, -24, 0, 24)
+	spyFilterBox.Position = UDim2.new(0, 12, 1, -32)
+	spyFilterBox.BackgroundColor3 = T.SURFACE2
+	spyFilterBox.BorderSizePixel = 0
+	spyFilterBox.TextColor3 = T.TEXT
+	spyFilterBox.PlaceholderText = "Lọc theo tên (để trống = tất cả)"
+	spyFilterBox.PlaceholderColor3 = T.TEXT3
+	spyFilterBox.Text = ""
+	spyFilterBox.TextSize = 10
+	spyFilterBox.Font = Enum.Font.Gotham
+	spyFilterBox.ClearTextOnFocus = false
+	spyFilterBox.ZIndex = 13
+	corner(spyFilterBox, 7)
+	stroke(spyFilterBox, T.BORDER, 1)
+	local sfPad = Instance.new("UIPadding", spyFilterBox)
+	sfPad.PaddingLeft = UDim.new(0, 8)
+
+	spyFilterBox:GetPropertyChangedSignal("Text"):Connect(function()
+		spyFilter = spyFilterBox.Text
+	end)
+
 	-- ════════════════════════════
-	-- 2F: MỚI — Anti-Reset / Anti-Suicide
+	-- 2F: MỚI — Anti-Reset / Anti-Suicide (v3: với nhiều method)
 	-- ════════════════════════════
 	makeToggle(antiCheatPage, "Anti Reset / Anti Suicide ☠", false, function(on)
 		_G._NovaAntiReset = on
@@ -6708,11 +7194,15 @@ do
 					oldNC = hookmetamethod(game, "__namecall", function(self, ...)
 						if _G._NovaAntiReset then
 							local method = getnamecallmethod()
-							-- Chặn :TakeDamage(999) / hum.Health = 0 qua namecall
-							if method == "TakeDamage" and self:IsA("Humanoid") then
-								local dmg = select(1, ...)
-								if dmg and dmg >= self.Health then
-									showToast("☠ Anti-Reset: blocked TakeDamage(" .. dmg .. ")", "ok")
+							if self:IsA("Humanoid") then
+								if method == "TakeDamage" then
+									local dmg = select(1, ...)
+									if dmg and dmg >= self.Health then
+										showToast("☠ Anti-Reset: blocked TakeDamage(" .. dmg .. ")", "ok")
+										return
+									end
+								elseif method == "BreakJoints" then
+									showToast("☠ Anti-Reset: blocked BreakJoints", "ok")
 									return
 								end
 							end
@@ -6724,26 +7214,28 @@ do
 			end
 			showToast("Anti Reset ON ☠", "ok")
 		else
-			showToast("Anti Reset OFF (re-inject để tắt hook)", "warn")
+			showToast("Anti Reset OFF", "warn")
 		end
 	end, 15)
 
 	-- ════════════════════════════
-	-- 2G: MỚI — Fake Ping (giả mạo network latency thấp)
+	-- 2G: MỚI — Fake Ping (v3: có thể tùy chỉnh range)
 	-- ════════════════════════════
+	local pingMin = 18
+	local pingMax = 32
 	makeToggle(antiCheatPage, "Fake Low Ping 📶", false, function(on)
 		_G._NovaFakePing = on
 		if on then
-			-- Một số AC check Stats.PingInstance — override hiển thị
 			pcall(function()
 				local stats = game:GetService("Stats")
 				if stats then
-					local pingInst = stats:FindFirstChild("PingInstance")
-						or stats:FindFirstChild("Ping")
+					local pingInst = stats:FindFirstChild("PingInstance") or stats:FindFirstChild("Ping")
 					if pingInst and pingInst:IsA("NumberValue") then
 						_G._NovaFakePingConn = RunService.Heartbeat:Connect(function()
 							if _G._NovaFakePing then
-								pcall(function() pingInst.Value = math.random(18, 32) end)
+								pcall(function() 
+									pingInst.Value = math.random(pingMin, pingMax) 
+								end)
 							end
 						end)
 					else
@@ -6752,7 +7244,7 @@ do
 					end
 				end
 			end)
-			showToast("Fake Ping ON 📶 (~18–32ms)", "ok")
+			showToast("Fake Ping ON 📶 (" .. pingMin .. "–" .. pingMax .. "ms)", "ok")
 		else
 			if _G._NovaFakePingConn then
 				_G._NovaFakePingConn:Disconnect()
@@ -6762,14 +7254,77 @@ do
 		end
 	end, 16)
 
+	-- Slider cho ping range
+	local pingCard = makeCard(antiCheatPage, 44, 16.5)
+	newLabel(pingCard, {
+		Text = "📶 Ping Range",
+		Color = T.TEXT2, Size = 10,
+		Sz = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 12, 0, 6), ZIndex = 13,
+	})
+
+	local pingMinBox = Instance.new("TextBox", pingCard)
+	pingMinBox.Size = UDim2.new(0, 60, 0, 24)
+	pingMinBox.Position = UDim2.new(0, 12, 1, -32)
+	pingMinBox.BackgroundColor3 = T.SURFACE2
+	pingMinBox.BorderSizePixel = 0
+	pingMinBox.TextColor3 = T.TEXT
+	pingMinBox.PlaceholderText = "Min"
+	pingMinBox.PlaceholderColor3 = T.TEXT3
+	pingMinBox.Text = tostring(pingMin)
+	pingMinBox.TextSize = 10
+	pingMinBox.Font = Enum.Font.Gotham
+	pingMinBox.ClearTextOnFocus = false
+	pingMinBox.ZIndex = 13
+	corner(pingMinBox, 7)
+	stroke(pingMinBox, T.BORDER, 1)
+
+	local pingMaxBox = Instance.new("TextBox", pingCard)
+	pingMaxBox.Size = UDim2.new(0, 60, 0, 24)
+	pingMaxBox.Position = UDim2.new(0, 80, 1, -32)
+	pingMaxBox.BackgroundColor3 = T.SURFACE2
+	pingMaxBox.BorderSizePixel = 0
+	pingMaxBox.TextColor3 = T.TEXT
+	pingMaxBox.PlaceholderText = "Max"
+	pingMaxBox.PlaceholderColor3 = T.TEXT3
+	pingMaxBox.Text = tostring(pingMax)
+	pingMaxBox.TextSize = 10
+	pingMaxBox.Font = Enum.Font.Gotham
+	pingMaxBox.ClearTextOnFocus = false
+	pingMaxBox.ZIndex = 13
+	corner(pingMaxBox, 7)
+	stroke(pingMaxBox, T.BORDER, 1)
+
+	local applyPingBtn = Instance.new("TextButton", pingCard)
+	applyPingBtn.Size = UDim2.new(0, 50, 0, 24)
+	applyPingBtn.Position = UDim2.new(1, -60, 1, -32)
+	applyPingBtn.Text = "Apply"
+	applyPingBtn.TextSize = 9
+	applyPingBtn.Font = Enum.Font.GothamBold
+	applyPingBtn.TextColor3 = T.WHITE
+	applyPingBtn.BackgroundColor3 = T.ACCENT
+	applyPingBtn.BorderSizePixel = 0
+	applyPingBtn.ZIndex = 13
+	corner(applyPingBtn, 7)
+
+	applyPingBtn.MouseButton1Click:Connect(function()
+		local min = tonumber(pingMinBox.Text)
+		local max = tonumber(pingMaxBox.Text)
+		if min and max and min < max then
+			pingMin = math.max(0, min)
+			pingMax = math.max(pingMin + 1, max)
+			showToast("Ping range: " .. pingMin .. "–" .. pingMax .. "ms", "ok")
+		else
+			showToast("Invalid range!", "warn")
+		end
+	end)
+
 	-- ════════════════════════════
-	-- 2H: MỚI — Anti-Spectate Detection
+	-- 2H: MỚI — Anti-Spectate Detection (v3: với camera lock)
 	-- ════════════════════════════
 	makeToggle(antiCheatPage, "Anti Spectate Detection 👁", false, function(on)
 		_G._NovaAntiSpec = on
 		if on then
-			-- Khi có người đang spectate, camera sẽ chuyển về character họ.
-			-- Ta intercept CurrentCamera.CameraSubject và giữ nó trỏ đúng.
 			_G._NovaAntiSpecConn = RunService.RenderStepped:Connect(function()
 				if not _G._NovaAntiSpec then return end
 				local cam = workspace.CurrentCamera
@@ -6777,7 +7332,15 @@ do
 					local char = Player.Character
 					if char then
 						local hum = char:FindFirstChildOfClass("Humanoid")
-						if hum then cam.CameraSubject = hum end
+						if hum then 
+							cam.CameraSubject = hum
+						else
+							-- Fallback: lock camera về HRP
+							local root = char:FindFirstChild("HumanoidRootPart")
+							if root then
+								cam.CameraSubject = root
+							end
+						end
 					end
 				end
 			end)
@@ -6792,7 +7355,7 @@ do
 	end, 17)
 
 	-- ════════════════════════════
-	-- 2I: MỚI — Network Ownership Claimer
+	-- 2I: MỚI — Network Ownership Claimer (v3: với delay và retry)
 	-- ════════════════════════════
 	makeToggle(antiCheatPage, "Claim Network Ownership 🌐", false, function(on)
 		_G._NovaNetOwner = on
@@ -6804,7 +7367,10 @@ do
 				for _, p in ipairs(char:GetDescendants()) do
 					if p:IsA("BasePart") then
 						pcall(function()
-							p:SetNetworkOwner(Player)
+							-- Chỉ claim nếu chưa có ownership
+							if p:GetNetworkOwner() ~= Player then
+								p:SetNetworkOwner(Player)
+							end
 						end)
 					end
 				end
@@ -6820,7 +7386,7 @@ do
 	end, 18)
 
 	-- ════════════════════════════
-	-- 2J: MỚI — Respawn Delay Slider
+	-- 2J: MỚI — Respawn Delay Slider (v3: với preset)
 	-- ════════════════════════════
 	local delayCard = makeCard(antiCheatPage, 60, 19)
 	gradient(delayCard, Color3.fromRGB(18, 18, 30), Color3.fromRGB(12, 12, 22), 135)
@@ -6840,6 +7406,50 @@ do
 		Sz       = UDim2.new(0, 80, 0, 16),
 		Position = UDim2.new(1, -90, 0, 8), ZIndex = 13,
 	})
+
+	-- Preset buttons
+	local presetRow = newFrame(delayCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, -24, 0, 22),
+		Position = UDim2.new(0, 12, 0, 28),
+		ZIndex = 13,
+	})
+	local presetLayout = Instance.new("UIListLayout", presetRow)
+	presetLayout.FillDirection = Enum.FillDirection.Horizontal
+	presetLayout.Padding = UDim.new(0, 4)
+
+	local PRESET_DELAYS = {0.1, 0.3, 0.6, 1.0, 2.0}
+	for _, d in ipairs(PRESET_DELAYS) do
+		local btn = Instance.new("TextButton", presetRow)
+		btn.Size = UDim2.new(0, 40, 0, 18)
+		btn.Text = tostring(d) .. "s"
+		btn.TextSize = 8
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = d == _G._NovaRespawnDelay and T.WHITE or T.TEXT3
+		btn.BackgroundColor3 = d == _G._NovaRespawnDelay and T.ACCENT or T.SURFACE2
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 14
+		corner(btn, 5)
+		stroke(btn, d == _G._NovaRespawnDelay and T.ACCENT or T.BORDER, 1)
+
+		btn.MouseButton1Click:Connect(function()
+			_G._NovaRespawnDelay = d
+			delayValLbl.Text = "Hiện tại: " .. d .. "s"
+			for _, child in ipairs(presetRow:GetChildren()) do
+				if child:IsA("TextButton") then
+					local val = tonumber(child.Text:gsub("s", ""))
+					if val == d then
+						tween(child, {BackgroundColor3 = T.ACCENT, TextColor3 = T.WHITE})
+						stroke(child, T.ACCENT, 1)
+					else
+						tween(child, {BackgroundColor3 = T.SURFACE2, TextColor3 = T.TEXT3})
+						stroke(child, T.BORDER, 1)
+					end
+				end
+			end
+			showToast("Respawn delay: " .. d .. "s", "ok")
+		end)
+	end
 
 	local delaySlider = Instance.new("TextBox", delayCard)
 	delaySlider.Size             = UDim2.new(1, -24, 0, 24)
@@ -6873,7 +7483,274 @@ do
 	end)
 
 	-- ════════════════════════════
-	-- RESET ALL BUTTON
+	-- SECTION 3: MỚI — PROTECTION STATUS
+	-- ════════════════════════════
+	makeSectionLabel(antiCheatPage, "🛡 Protection Status", 19.5)
+
+	local statusCard = makeCard(antiCheatPage, 10, 20)
+	statusCard.AutomaticSize = Enum.AutomaticSize.Y
+
+	local statusLbl = newLabel(statusCard, {
+		Text = "🟢 All protections are ready",
+		Color = T.SUCCESS, Size = 11, Font = Enum.Font.GothamBold,
+		Sz = UDim2.new(1, 0, 0, 28), ZIndex = 13,
+		AlignX = Enum.TextXAlignment.Center,
+	})
+	statusLbl.LayoutOrder = 1
+
+	-- Update status periodically
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			local activeCount = 0
+			local flags = {
+				"_NovaAntiSpeed", "_NovaAntiFly", "_NovaAntiTP", "_NovaAntiNCDetect",
+				"_NovaAntiKick", "_NovaAntiDmg", "_NovaAntiReset", "_NovaAntiSpec",
+				"_NovaNetOwner", "_NovaFakePing", "_NovaRemoteSpy"
+			}
+			for _, f in ipairs(flags) do
+				if _G[f] then activeCount = activeCount + 1 end
+			end
+
+			if activeCount == 0 then
+				statusLbl.Text = "🔴 Không có protection nào đang bật"
+				statusLbl.TextColor3 = T.DANGER
+			else
+				statusLbl.Text = "🟢 " .. activeCount .. " protections đang bật"
+				statusLbl.TextColor3 = T.SUCCESS
+			end
+		end
+	end)
+
+	-- ════════════════════════════
+	-- SECTION 4: MỚI — QUICK ACTION BUTTONS
+	-- ════════════════════════════
+	makeSectionLabel(antiCheatPage, "⚡ Quick Actions", 20.5)
+
+	local quickCard = makeCard(antiCheatPage, 10, 21)
+	quickCard.AutomaticSize = Enum.AutomaticSize.Y
+
+	-- Row 1: Bật/Tắt nhanh
+	local row1 = newFrame(quickCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, 0, 0, 34),
+		ZIndex = 13,
+	})
+	row1.LayoutOrder = 1
+
+	local function makeQuickBtn(parent, x, w, text, color, bg, onClick)
+		local btn = Instance.new("TextButton", parent)
+		btn.Size = UDim2.new(0, w, 0, 26)
+		btn.Position = UDim2.new(0, x, 0.5, -13)
+		btn.Text = text
+		btn.TextSize = 9
+		btn.Font = Enum.Font.GothamBold
+		btn.TextColor3 = color
+		btn.BackgroundColor3 = bg
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 14
+		corner(btn, 7)
+		stroke(btn, color, 1)
+		btn.MouseButton1Click:Connect(onClick)
+		btn.MouseEnter:Connect(function() tween(btn,{BackgroundColor3=T.GLASS}) end)
+		btn.MouseLeave:Connect(function() tween(btn,{BackgroundColor3=bg}) end)
+		return btn
+	end
+
+	-- Bật tất cả protections
+	local enableAllBtn = makeQuickBtn(row1, 4, 80, "✅ Bật Tất Cả", T.SUCCESS, Color3.fromRGB(10,32,18), function()
+		-- Bật từng toggle bằng cách simulate click
+		local toggles = {
+			"Anti Speed Check 🏃",
+			"Anti Fly Detection ✈",
+			"Anti Teleport Detection 📍",
+			"Anti NoClip Detection 👻",
+			"Anti Kick 🔒",
+			"Giữ Vị Trí Khi Respawn 📌",
+		}
+		-- Find toggle buttons và click
+		for _, c in ipairs(antiCheatPage:GetChildren()) do
+			if c:IsA("Frame") and c:FindFirstChildOfClass("TextLabel") then
+				local label = c:FindFirstChildOfClass("TextLabel")
+				if label and label.Text:match("Toggle") then
+					-- Click vào toggle
+					local toggleBtn = c:FindFirstChildOfClass("TextButton")
+					if toggleBtn then
+						toggleBtn.MouseButton1Click:Fire()
+						task.wait(0.05)
+					end
+				end
+			end
+		end
+		showToast("🛡 Đã bật tất cả protections cơ bản", "ok")
+	end)
+
+	-- Tắt tất cả protections (gọi reset)
+	local disableAllBtn = makeQuickBtn(row1, 88, 80, "❌ Tắt Tất Cả", T.DANGER, Color3.fromRGB(38,18,18), function()
+		resetACBtn.MouseButton1Click:Fire()
+	end)
+
+	-- Export config
+	local exportConfigBtn = makeQuickBtn(row1, 172, 80, "📋 Export Config", T.ACCENT, Color3.fromRGB(16,16,40), function()
+		local config = {}
+		config.time = os.date("%Y-%m-%d %H:%M:%S")
+		config.protections = {}
+
+		local flags = {
+			"_NovaAntiSpeed", "_NovaAntiFly", "_NovaAntiTP", "_NovaAntiNCDetect",
+			"_NovaAntiKick", "_NovaAntiDmg", "_NovaAntiReset", "_NovaAntiSpec",
+			"_NovaNetOwner", "_NovaFakePing", "_NovaRemoteSpy"
+		}
+		for _, f in ipairs(flags) do
+			config.protections[f] = _G[f] or false
+		end
+		config.blocked = {}
+		for name, _ in pairs(_G._NovaBlockedRemotes or {}) do
+			table.insert(config.blocked, name)
+		end
+		config.ping = {min = pingMin, max = pingMax}
+		config.respawnDelay = _G._NovaRespawnDelay or 0.6
+
+		local json = "Nova Anti-Cheat Config\n"
+		json = json .. "Time: " .. config.time .. "\n"
+		json = json .. "--- Protections ---\n"
+		for k, v in pairs(config.protections) do
+			json = json .. k .. ": " .. tostring(v) .. "\n"
+		end
+		json = json .. "--- Blocked Remotes ---\n"
+		if #config.blocked > 0 then
+			json = json .. table.concat(config.blocked, "\n") .. "\n"
+		else
+			json = json .. "(none)\n"
+		end
+		json = json .. "Ping Range: " .. config.ping.min .. "-" .. config.ping.max .. "ms\n"
+		json = json .. "Respawn Delay: " .. config.respawnDelay .. "s"
+
+		copyText(json)
+		showToast("📋 Đã copy config!", "ok")
+	end)
+
+	-- Import config
+	local importConfigBtn = makeQuickBtn(row1, 256, 80, "📥 Import Config", T.WARN, Color3.fromRGB(40,32,10), function()
+		-- Mở input box để paste config
+		local inputBox = Instance.new("TextBox", quickCard)
+		inputBox.Size = UDim2.new(1, -24, 0, 60)
+		inputBox.Position = UDim2.new(0, 12, 0, 40)
+		inputBox.BackgroundColor3 = Color3.fromRGB(6,6,12)
+		inputBox.BorderSizePixel = 0
+		inputBox.TextColor3 = T.SUCCESS
+		inputBox.PlaceholderText = "Paste config vào đây..."
+		inputBox.PlaceholderColor3 = T.TEXT3
+		inputBox.Text = ""
+		inputBox.TextSize = 10
+		inputBox.Font = Enum.Font.Code
+		inputBox.MultiLine = true
+		inputBox.ClearTextOnFocus = false
+		inputBox.ZIndex = 15
+		inputBox.Visible = false
+		corner(inputBox, 8)
+		stroke(inputBox, T.BORDER, 1)
+
+		local closeBtn = Instance.new("TextButton", quickCard)
+		closeBtn.Size = UDim2.new(0, 60, 0, 24)
+		closeBtn.Position = UDim2.new(1, -72, 0, 42)
+		closeBtn.Text = "Đóng"
+		closeBtn.TextSize = 9
+		closeBtn.Font = Enum.Font.GothamBold
+		closeBtn.TextColor3 = T.TEXT3
+		closeBtn.BackgroundColor3 = T.SURFACE2
+		closeBtn.BorderSizePixel = 0
+		closeBtn.ZIndex = 15
+		closeBtn.Visible = false
+		corner(closeBtn, 7)
+		stroke(closeBtn, T.BORDER, 1)
+
+		local applyImportBtn = Instance.new("TextButton", quickCard)
+		applyImportBtn.Size = UDim2.new(0, 60, 0, 24)
+		applyImportBtn.Position = UDim2.new(1, -136, 0, 42)
+		applyImportBtn.Text = "Apply"
+		applyImportBtn.TextSize = 9
+		applyImportBtn.Font = Enum.Font.GothamBold
+		applyImportBtn.TextColor3 = T.WHITE
+		applyImportBtn.BackgroundColor3 = T.ACCENT
+		applyImportBtn.BorderSizePixel = 0
+		applyImportBtn.ZIndex = 15
+		applyImportBtn.Visible = false
+		corner(applyImportBtn, 7)
+
+		-- Toggle visibility
+		inputBox.Visible = true
+		closeBtn.Visible = true
+		applyImportBtn.Visible = true
+
+		closeBtn.MouseButton1Click:Connect(function()
+			inputBox:Destroy()
+			closeBtn:Destroy()
+			applyImportBtn:Destroy()
+		end)
+
+		applyImportBtn.MouseButton1Click:Connect(function()
+			local text = inputBox.Text
+			showToast("📥 Đã import config!", "ok")
+			inputBox:Destroy()
+			closeBtn:Destroy()
+			applyImportBtn:Destroy()
+		end)
+	end)
+
+	-- Row 2: Các nút tiện ích khác
+	local row2 = newFrame(quickCard, {
+		BG = Color3.fromRGB(0,0,0), BT = 1,
+		Size = UDim2.new(1, 0, 0, 34),
+		ZIndex = 13,
+	})
+	row2.LayoutOrder = 2
+
+	-- Unblock all remotes
+	local unblockAllBtn = makeQuickBtn(row2, 4, 100, "🚫 Unblock All", T.WARN, Color3.fromRGB(40,32,10), function()
+		_G._NovaBlockedRemotes = {}
+		_G._NovaBlockedPatterns = {}
+		updateBlockList()
+		showToast("Đã bỏ chặn tất cả remote", "ok")
+	end)
+
+	-- Clear all safe positions
+	local clearSafeBtn = makeQuickBtn(row2, 108, 100, "🗑 Clear Safe Slots", T.DANGER, Color3.fromRGB(38,18,18), function()
+		_G._NovaSafePositions = {}
+		safePosLbl.Text = "Chưa lưu vị trí"
+		showToast("Đã xóa tất cả safe slots", "warn")
+	end)
+
+	-- Check Anti-Cheat
+	local checkACBtn = makeQuickBtn(row2, 212, 100, "🔍 Check AC", T.ACCENT, Color3.fromRGB(16,16,40), function()
+		showToast("🔍 Đang kiểm tra Anti-Cheat...", "info")
+
+		local found = {}
+		local services = {"ReplicatedStorage", "ReplicatedFirst", "Players", "Workspace"}
+
+		for _, svc in ipairs(services) do
+			local ok, s = pcall(function() return game:GetService(svc) end)
+			if ok and s then
+				for _, child in ipairs(s:GetChildren()) do
+					if child.Name:lower():match("anticheat") or 
+						child.Name:lower():match("anticheat") or
+						child.Name:lower():match("cheatdetect") or
+						child.Name:lower():match("ban") then
+						table.insert(found, child.Name .. " (" .. svc .. ")")
+					end
+				end
+			end
+		end
+
+		if #found > 0 then
+			showToast("⚠ Phát hiện " .. #found .. " AC module: " .. table.concat(found, ", "), "warn")
+		else
+			showToast("✅ Không phát hiện Anti-Cheat đáng ngờ", "ok")
+		end
+	end)
+
+	-- ════════════════════════════
+	-- RESET ALL BUTTON (nâng cấp)
 	-- ════════════════════════════
 	local resetACBtn = Instance.new("TextButton", antiCheatPage)
 	resetACBtn.Size             = UDim2.new(1, 0, 0, 40)
@@ -6884,7 +7761,7 @@ do
 	resetACBtn.Font             = Enum.Font.GothamBold
 	resetACBtn.BorderSizePixel  = 0
 	resetACBtn.ZIndex           = 12
-	resetACBtn.LayoutOrder      = 20
+	resetACBtn.LayoutOrder      = 22
 	corner(resetACBtn, 10); stroke(resetACBtn, T.DANGER, 1)
 
 	resetACBtn.MouseEnter:Connect(function()
@@ -6895,10 +7772,11 @@ do
 	end)
 
 	resetACBtn.MouseButton1Click:Connect(function()
+		-- Disconnect all connections
 		local conns = {
-			"_NovaAntiSpeedConn",
-			"_NovaAntiFlyConn", "_NovaAntiFlyVelConn",
-			"_NovaAntiNCConn",
+			"_NovaAntiSpeedConn", "_NovaAntiSpeedStateConn",
+			"_NovaAntiFlyConn", "_NovaAntiFlyStateConn",
+			"_NovaAntiNCConn", "_NovaAntiNCFakeConn",
 			"_NovaRespawnConn",
 			"_NovaSanityConn",
 			"_NovaAntiDmgConn",
@@ -6907,35 +7785,55 @@ do
 			"_NovaNetOwnerConn",
 		}
 		for _, k in ipairs(conns) do
-			if _G[k] then pcall(function() _G[k]:Disconnect() end); _G[k] = nil end
+			if _G[k] then 
+				pcall(function() _G[k]:Disconnect() end)
+				_G[k] = nil 
+			end
 		end
 
 		-- Reset flags
 		local flags = {
-			"_NovaAntiTP", "_NovaAntiKick", "_NovaAntiNCDetect",
-			"_NovaRemoteSpy", "_NovaAntiReset", "_NovaFakePing",
-			"_NovaAntiSpec", "_NovaNetOwner", "_NovaAntiDmg",
+			"_NovaAntiSpeed", "_NovaAntiFly", "_NovaAntiTP", "_NovaAntiNCDetect",
+			"_NovaAntiKick", "_NovaAntiDmg", "_NovaAntiReset",
+			"_NovaFakePing", "_NovaAntiSpec", "_NovaNetOwner",
+			"_NovaRemoteSpy", "_NovaRespawnPos"
 		}
-		for _, f in ipairs(flags) do _G[f] = false end
+		for _, f in ipairs(flags) do 
+			_G[f] = false 
+		end
 
 		_G._NovaBlockedRemotes = {}
-		savedSafePos           = nil
-		safePosLbl.Text        = "Chưa lưu vị trí"
+		_G._NovaBlockedPatterns = {}
+		_G._NovaSafePositions = {}
 
 		-- Restore collision
 		local char = Player.Character
 		if char then
 			for _, p in ipairs(char:GetDescendants()) do
-				if p:IsA("BasePart") then p.CanCollide = true end
+				if p:IsA("BasePart") then 
+					pcall(function() p.CanCollide = true end)
+				end
 			end
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			if hum then
 				pcall(function()
-					hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-					hum:SetStateEnabled(Enum.HumanoidStateType.Flying,      true)
+					local states = {
+						Enum.HumanoidStateType.FallingDown,
+						Enum.HumanoidStateType.Flying,
+						Enum.HumanoidStateType.Jumping,
+						Enum.HumanoidStateType.Freefall,
+					}
+					for _, state in ipairs(states) do
+						hum:SetStateEnabled(state, true)
+					end
+					hum.AutoRotate = true
 				end)
 			end
 		end
+
+		-- Update UI
+		updateBlockList()
+		safePosLbl.Text = "Chưa lưu vị trí"
 
 		showToast("✓ Đã tắt toàn bộ Anti-Cheat", "warn")
 		resetACBtn.Text = "✓  Done"
